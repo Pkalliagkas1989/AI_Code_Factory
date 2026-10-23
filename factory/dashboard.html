@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Code Factory</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --muted: #6b7385; --line: #e2e5eb;
+    --pass: #1f8a4c; --pass-bg: #e3f4ea; --changes: #b4441c; --changes-bg: #fbe9e1;
+    --pending: #8a90a0; --pending-bg: #eef0f4; --human: #c27c00; --human-bg: #fff4dc;
+    --accent: #3d5afe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b1f27; --ink: #e6e9ef; --muted: #8d94a5; --line: #2a303b;
+      --pass: #4cc47e; --pass-bg: #173326; --changes: #f08a5d; --changes-bg: #3a2219;
+      --pending: #8d94a5; --pending-bg: #252a34; --human: #f2b544; --human-bg: #3a2e14;
+      --accent: #7c8dff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 18px 16px 8px; }
+  h1 { font-size: 18px; margin: 0; }
+  #status { color: var(--muted); font-size: 12px; }
+  #board { display: grid; grid-template-columns: repeat(6, minmax(190px, 1fr)); gap: 12px;
+           padding: 8px 16px 24px; overflow-x: auto; }
+  @media (max-width: 760px) { #board { grid-template-columns: 1fr; } }
+  .col { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+         padding: 10px; min-height: 120px; }
+  .col h2 { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+            margin: 2px 4px 10px; display: flex; justify-content: space-between; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 8px;
+          background: var(--bg); cursor: pointer; }
+  .card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
+  .card.human { border-color: var(--human); background: var(--human-bg); }
+  .card .id { font: 600 12px ui-monospace, Menlo, monospace; }
+  .card .feat { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
+  .round { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .round span.n { font-size: 11px; color: var(--muted); width: 22px; }
+  .chip { font-size: 11px; padding: 1px 6px; border-radius: 99px; background: var(--pending-bg); color: var(--pending); }
+  .chip.PASS { background: var(--pass-bg); color: var(--pass); }
+  .chip.CHANGES { background: var(--changes-bg); color: var(--changes); }
+  .empty { color: var(--muted); font-size: 12px; margin: 4px; }
+  dialog { width: min(860px, calc(100vw - 32px)); max-height: 86vh; border: 1px solid var(--line);
+           border-radius: 12px; padding: 0; background: var(--panel); color: var(--ink); }
+  dialog::backdrop { background: rgb(0 0 0 / .4); }
+  .dlg { display: grid; grid-template-columns: 200px 1fr; min-height: 60vh; }
+  @media (max-width: 760px) { .dlg { grid-template-columns: 1fr; } }
+  .files { border-right: 1px solid var(--line); padding: 12px; }
+  .files button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--ink);
+                  padding: 5px 8px; border-radius: 6px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer; }
+  .files button.on { background: var(--pending-bg); }
+  .doc { padding: 14px 20px; overflow: auto; max-height: 86vh; }
+  .doc pre { background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto; }
+  .doc code { font: 12px ui-monospace, Menlo, monospace; }
+  .close { float: right; border: 0; background: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+<header><h1>AI Code Factory</h1><span id="status">loading…</span></header>
+<main id="board"></main>
+<dialog id="dlg"><div class="dlg"><nav class="files" id="files"></nav><article class="doc" id="doc"></article></div></dialog>
+
+<script>
+const STAGES = ['spec', 'build', 'review', 'approve', 'merged', 'needs-human']
+const LABELS = { 'needs-human': 'needs you' }
+const LENSES = ['security', 'ux', 'ui', 'code']
+
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+async function get(url) {
+  const r = await fetch(url, { cache: 'no-store' })
+  if (!r.ok) throw new Error(url + ' ' + r.status)
+  return r.text()
+}
+
+// python3 -m http.server renders folders as an HTML list of links
+async function listDir(url) {
+  const html = new DOMParser().parseFromString(await get(url), 'text/html')
+  return [...html.querySelectorAll('a')].map((a) => decodeURIComponent(a.getAttribute('href')))
+}
+
+async function loadJobs() {
+  const ids = (await listDir('jobs/')).filter((h) => /^\d{3}-.+\/$/.test(h)).map((h) => h.slice(0, -1))
+  const jobs = await Promise.all(ids.map(async (id) => {
+    try {
+      const job = JSON.parse(await get(`jobs/${id}/job.json`))
+      job.rounds = await loadRounds(job)
+      return job
+    } catch { return null }  // job folder claimed but job.json not written yet
+  }))
+  return jobs.filter(Boolean).sort((a, b) => a.id.localeCompare(b.id))
+}
+
+// Earlier rounds come from their review files; the current round from job.json
+async function loadRounds(job) {
+  const rounds = []
+  for (let n = 1; n <= job.round; n++) {
+    if (n === job.round) { rounds.push(job.reviews); continue }
+    const r = {}
+    for (const k of LENSES) {
+      try { r[k] = /^VERDICT:\s*(PASS|CHANGES)/.exec(await get(`jobs/${job.id}/round-${n}/review-${k}.md`))?.[1] ?? 'pending' }
+      catch { r[k] = 'pending' }
+    }
+    rounds.push(r)
+  }
+  return rounds
+}
+
+function card(job) {
+  const rounds = job.rounds.map((r, i) =>
+    `<div class="round"><span class="n">R${i + 1}</span>${LENSES.map((k) => `<span class="chip ${r[k]}">${k}</span>`).join('')}</div>`
+  ).join('')
+  return `<div class="card ${job.stage === 'needs-human' ? 'human' : ''}" tabindex="0" data-id="${esc(job.id)}">
+    <div class="id">${esc(job.id)}</div><div class="feat">${esc(job.feature || '')}</div>${rounds}</div>`
+}
+
+function render(jobs) {
+  document.getElementById('board').innerHTML = STAGES.map((s) => {
+    const here = jobs.filter((j) => j.stage === s)
+    return `<section class="col"><h2>${LABELS[s] || s}<span>${here.length}</span></h2>
+      ${here.map(card).join('') || '<div class="empty">—</div>'}</section>`
+  }).join('')
+}
+
+// Small markdown renderer: headings, lists, code, bold, inline code, links
+function md(src) {
+  const out = []
+  let inCode = false, list = null
+  const inline = (t) => esc(t)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+  const endList = () => { if (list) { out.push(`</${list}>`); list = null } }
+  for (const line of src.split('\n')) {
+    if (line.startsWith('```')) { endList(); out.push(inCode ? '</code></pre>' : '<pre><code>'); inCode = !inCode; continue }
+    if (inCode) { out.push(esc(line) + '\n'); continue }
+    let m
+    if ((m = /^(#{1,4})\s+(.*)/.exec(line))) { endList(); out.push(`<h${m[1].length + 1}>${inline(m[2])}</h${m[1].length + 1}>`) }
+    else if ((m = /^\s*(?:[-*]|\d+\.)\s+(.*)/.exec(line))) {
+      const tag = /^\s*\d+\./.test(line) ? 'ol' : 'ul'
+      if (list !== tag) { endList(); out.push(`<${tag}>`); list = tag }
+      out.push(`<li>${inline(m[1])}</li>`)
+    }
+    else if (line.trim() === '') endList()
+    else { endList(); out.push(`<p>${inline(line)}</p>`) }
+  }
+  endList()
+  if (inCode) out.push('</code></pre>')
+  return out.join('')
+}
+
+async function openJob(id) {
+  const base = `jobs/${id}/`
+  const files = []
+  for (const h of await listDir(base)) {
+    if (/^round-\d+\/$/.test(h)) for (const f of await listDir(base + h)) { if (f.endsWith('.md')) files.push(h + f) }
+    else if (/\.(md|json)$/.test(h)) files.push(h)
+  }
+  const order = (f) => ['job.json', 'spec.md', 'build.md'].indexOf(f) + 1 || (f === 'decision.md' ? 90 : 50)
+  files.sort((a, b) => order(a) - order(b) || a.localeCompare(b, undefined, { numeric: true }))
+  const nav = document.getElementById('files')
+  nav.innerHTML = `<button class="close" aria-label="Close">×</button><div class="id" style="margin:4px 8px 10px">${esc(id)}</div>` +
+    files.map((f) => `<button data-f="${esc(f)}">${esc(f)}</button>`).join('')
+  nav.querySelector('.close').onclick = () => document.getElementById('dlg').close()
+  const show = async (f) => {
+    nav.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('on', b.dataset.f === f))
+    const text = await get(base + f)
+    document.getElementById('doc').innerHTML = f.endsWith('.json') ? `<pre><code>${esc(text)}</code></pre>` : md(text)
+  }
+  nav.querySelectorAll('[data-f]').forEach((b) => b.onclick = () => show(b.dataset.f))
+  document.getElementById('dlg').showModal()
+  const first = files.find((f) => f === 'decision.md') || files.find((f) => f === 'spec.md') || files[0]
+  if (first) show(first)
+}
+
+document.getElementById('board').addEventListener('click', (e) => {
+  const c = e.target.closest('.card'); if (c) openJob(c.dataset.id)
+})
+document.getElementById('board').addEventListener('keydown', (e) => {
+  const c = e.target.closest('.card'); if (c && e.key === 'Enter') openJob(c.dataset.id)
+})
+
+async function tick() {
+  const status = document.getElementById('status')
+  try {
+    const jobs = await loadJobs()
+    render(jobs)
+    status.textContent = `${jobs.length} job${jobs.length === 1 ? '' : 's'} · updated ${new Date().toLocaleTimeString()}`
+  } catch (err) {
+    status.textContent = 'cannot read jobs/ — run "python3 -m http.server" from the factory folder'
+  }
+}
+tick()
+setInterval(tick, 2000)
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Factory runtime state: one folder per job, written while jobs run
+/factory/jobs/*
+!/factory/jobs/.gitkeep
+
+.DS_Store
