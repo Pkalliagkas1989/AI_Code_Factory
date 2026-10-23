@@ -41,7 +41,12 @@ rewrites files (`--fix`).
 - **Conventions**: matches `CLAUDE.md` and the neighbouring code, including how
   much it comments.
 - **Docs**: `CLAUDE.md` and other listed docs are updated where needed.
-- **Commits**: short one-line messages, nothing stray committed.
+- **Commits**: nothing stray committed, and every message is production-ready:
+  the project's convention from `CLAUDE.md`, or otherwise Conventional Commits
+  (`type(scope): summary` in the imperative, first line at most 72 characters,
+  a body explaining what and why). Vague messages ("wip", "fix stuff",
+  "address review") are CHANGES: list each commit to reword and a better
+  message.
 
 ## review-code.md
 

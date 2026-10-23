@@ -2,15 +2,18 @@
 
 A software factory for [Claude Code](https://claude.com/claude-code): one skill,
 seven subagents and a handful of markdown files. Type `/factory <feature>` and a
-team of agents writes a spec, builds it on its own git branch, reviews it from
-four angles, and then either merges it into `main` or asks you to decide.
+team of agents writes a spec, builds it on its own git branch, and reviews it
+from four angles. Then the approver explains each department's work in plain
+words and hands you the exact commands to merge it. **You always do the merge.**
 
 ```
 request ─► spec-writer ─► builder ─► security · ux · ui · code  (in parallel)
                              ▲                    │
                              └──── CHANGES ◄──────┤  (max 2 extra rounds)
-                                                  ▼ all PASS
-                     merge into main ◄─ APPROVE ─ approver ─ ESCALATE ─► needs you
+                                                  ▼
+                                              approver ─► plain-language report
+                                                        + recommendation (MERGE / HOLD)
+                                                        + merge commands for you to run
 ```
 
 Inspired by ZazenCodes' video
@@ -29,7 +32,7 @@ All files here were written for this repo.
     reviewer-ux.md            sonnet   → round-N/review-ux.md
     reviewer-ui.md            sonnet   → round-N/review-ui.md
     reviewer-code.md          sonnet   → round-N/review-code.md
-    approver.md               opus     → decision.md
+    approver.md               opus     → decision.md (report + merge commands)
 factory/
   backlog.md                  feature queue for /factory next
   dashboard.html              live board of all jobs
@@ -44,22 +47,31 @@ templates/
   every agent and is the only writer of the job's `job.json`.
 - Agents don't share a conversation. They read files, and each writes **one**
   file. Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; the decision
-  starts with `APPROVE` or `ESCALATE`.
+  starts with `RECOMMEND: MERGE` or `RECOMMEND: HOLD`.
 - The four reviewers run **in parallel**. When any of them asks for changes, the
   same builder is resumed with their feedback.
-- The approver escalates anything risky to you: payments, auth, deployment
-  config, new dependencies, database migrations, and business decisions.
+- The approver writes `decision.md`: a short plain-language summary of what
+  each department (spec, build, security, UX, design, code) did, a
+  recommendation (MERGE, or HOLD for anything risky like payments, auth,
+  deployment config, new dependencies, migrations or business decisions), and
+  ready-to-paste merge commands.
+- **The factory never merges, pushes or deletes branches.** You run the
+  commands, then `/factory done <job-id>` confirms the merge on the dashboard.
+- **Production-ready commit messages**: your project's convention from
+  `CLAUDE.md`, otherwise [Conventional Commits](https://www.conventionalcommits.org)
+  (`feat(auth): add password reset` plus a body explaining what and why). The
+  code reviewer rejects vague messages, and the approver writes the merge
+  commit message.
 - Every job gets its own **git worktree** (`../<repo>-factory/<job-id>/`) on a
   `factory/<job-id>` branch. Open several Claude sessions and run `/factory` in
   each to build features in parallel.
-- The factory **never pushes**. You decide when to push.
 
 ## Commands
 
 ```
 /factory <feature>               run a new feature through the loop
 /factory next                    run the first unchecked item in factory/backlog.md
-/factory approve <job-id>        merge a job that is waiting for you
+/factory done <job-id>           after you ran the merge commands: verify and mark merged
 /factory rework <job-id> <note>  send a waiting job back to the builder with feedback
 ```
 
@@ -89,5 +101,5 @@ cd factory && python3 -m http.server
 ```
 
 Open <http://localhost:8000/dashboard.html>. Cards move across the stages, the
-review chips turn green or red as verdicts come in, and jobs waiting for you are
-highlighted. Click a card to read its files. It refreshes every 2 seconds.
+review chips turn green or red as verdicts come in, and jobs waiting for you
+("ready to merge" or "needs you") are highlighted. Click a card to read its files. It refreshes every 2 seconds.

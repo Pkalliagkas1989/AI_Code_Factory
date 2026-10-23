@@ -25,7 +25,7 @@
   header { display: flex; align-items: baseline; gap: 12px; padding: 18px 16px 8px; }
   h1 { font-size: 18px; margin: 0; }
   #status { color: var(--muted); font-size: 12px; }
-  #board { display: grid; grid-template-columns: repeat(6, minmax(190px, 1fr)); gap: 12px;
+  #board { display: grid; grid-template-columns: repeat(7, minmax(170px, 1fr)); gap: 12px;
            padding: 8px 16px 24px; overflow-x: auto; }
   @media (max-width: 760px) { #board { grid-template-columns: 1fr; } }
   .col { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -65,8 +65,8 @@
 <dialog id="dlg"><div class="dlg"><nav class="files" id="files"></nav><article class="doc" id="doc"></article></div></dialog>
 
 <script>
-const STAGES = ['spec', 'build', 'review', 'approve', 'merged', 'needs-human']
-const LABELS = { 'needs-human': 'needs you' }
+const STAGES = ['spec', 'build', 'review', 'approve', 'ready', 'needs-human', 'merged']
+const LABELS = { ready: 'ready to merge', 'needs-human': 'needs you' }
 const LENSES = ['security', 'ux', 'ui', 'code']
 
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
@@ -114,7 +114,7 @@ function card(job) {
   const rounds = job.rounds.map((r, i) =>
     `<div class="round"><span class="n">R${i + 1}</span>${LENSES.map((k) => `<span class="chip ${r[k]}">${k}</span>`).join('')}</div>`
   ).join('')
-  return `<div class="card ${job.stage === 'needs-human' ? 'human' : ''}" tabindex="0" data-id="${esc(job.id)}">
+  return `<div class="card ${['ready', 'needs-human'].includes(job.stage) ? 'human' : ''}" tabindex="0" data-id="${esc(job.id)}">
     <div class="id">${esc(job.id)}</div><div class="feat">${esc(job.feature || '')}</div>${rounds}</div>`
 }
 

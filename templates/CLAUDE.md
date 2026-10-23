@@ -48,6 +48,8 @@ npx eslint <files>   # lint only the changed files
 
 ## Conventions
 
+- Commit messages: <your convention, or delete this line to use Conventional
+  Commits: `type(scope): summary` + a body explaining what and why>
 - <naming, formatting, how components are structured>
 - <where styles and design tokens live>
 - <anything an agent must never do, e.g. never edit generated files in dist/>

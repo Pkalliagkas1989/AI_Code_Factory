@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Runs the AI code factory. Use when the user types /factory <feature>, /factory next, /factory approve <job-id> or /factory rework <job-id> <note>. The session running it becomes the orchestrator of one job through spec → build → review → approve.
+description: Runs the AI code factory. Use when the user types /factory <feature>, /factory next, /factory done <job-id> or /factory rework <job-id> <note>. The session running it becomes the orchestrator of one job through spec → build → review → approve. The human always does the merge.
 ---
 
 # /factory: the orchestrator
@@ -19,12 +19,20 @@ request ─► spec-writer ─► builder ─► ┌ reviewer-security ┐
                              │                                           ▼
                              └──── someone asked for CHANGES ◄──── round result
                                    (at most 2 extra rounds)              │ all PASS
+                                                                         │ or rounds used up
                                                                          ▼
-                                    merge into main ◄── APPROVE ── approver
-                                                                         │ ESCALATE
-                                                                         ▼
-                                                                   needs-human
+                                                                     approver
+                                                       RECOMMEND: MERGE │ RECOMMEND: HOLD
+                                                                 ▼              ▼
+                                                               ready       needs-human
+                                                                 └──────┬───────┘
+                                                                        ▼
+                                              the human runs the merge commands, then
+                                              /factory done <job-id>  ─►  merged
 ```
+
+**The factory never merges, pushes or deletes branches.** The approver writes
+the commands in `decision.md`; the human reads them and runs them.
 
 | Stage   | Agent (`subagent_type`) | Output file                                   |
 | ------- | ----------------------- | --------------------------------------------- |
@@ -59,7 +67,7 @@ spec.md                       spec-writer
 build.md                      builder
 rework-<k>.md                 you, from /factory rework
 round-<N>/review-<lens>.md    one per reviewer per round
-decision.md                   approver (or you, when rounds run out)
+decision.md                   approver
 ```
 
 ### job.json
@@ -74,8 +82,11 @@ Rewrite the whole file on every change:
   "reviews": { "security": "PASS", "ux": "pending", "ui": "pending", "code": "CHANGES" } }
 ```
 
-- `stage`: `spec`, `build`, `review`, `approve`, `merged` or `needs-human`.
-  Worktree setup counts as `spec`.
+- `stage`: `spec`, `build`, `review`, `approve`, `ready`, `needs-human` or
+  `merged`. Worktree setup counts as `spec`. `ready` means the approver
+  recommends merging and the human has not merged yet.
+- `head`: added at the approve stage. The commit the branch pointed to when the
+  approver ran (`git rev-parse factory/<job-id>`). `/factory done` uses it.
 - `round`: the current review round, or `0` before the first one.
 - `reviews`: the current round only. Each value is `pending`, `PASS` or `CHANGES`.
 
@@ -94,7 +105,7 @@ Agents that run the app get their own port so parallel jobs never collide. With
 Each job has its own branch, worktree, `job.json`, ports and browser sessions,
 so the user can open several Claude sessions in the repo and run `/factory` in
 each. Your session stays in the main checkout and touches only its own job. The
-main checkout belongs to the user: only **Merge** changes it.
+main checkout belongs to the user: you never change its code or its git state.
 
 ## /factory <feature>
 
@@ -138,44 +149,32 @@ The first line of `build.md` decides:
      to `builder-<job-id>`:
      `Round N reviews are in <job folder>/round-<N>/. Fix every finding in the VERDICT: CHANGES files, commit, and update build.md for round N+1.`
      When it returns, do **Check the build**.
-   - **Any CHANGES, no resumes left**: write `decision.md` yourself: the line
-     `ESCALATE`, a blank line, then
-     `Ran out of review rounds. Still CHANGES in round-<N>/ from: <reviewers>.`
-     Go to **Needs human**.
+   - **Any CHANGES, no resumes left**: go to **Approve** anyway. The approver
+     sees the open findings, recommends HOLD and explains them to the human.
 
 ### Approve
 
-Set `stage: "approve"`. Spawn `approver` with `<paths> Final round: N.` The
-first line of `decision.md` decides: `APPROVE` → **Merge**, `ESCALATE` →
-**Needs human**.
+Set `stage: "approve"` and `head` to the output of `git rev-parse factory/<job-id>`.
+Spawn `approver` with `<paths> Final round: N.` When it returns, read the first
+line of `decision.md`:
 
-### Merge
+- `RECOMMEND: MERGE`: set `stage: "ready"`.
+- `RECOMMEND: HOLD`: set `stage: "needs-human"`.
+- Anything else: stop and tell the user.
 
-The main checkout must be on `main` and clean, apart from `factory/backlog.md`
-(which `/factory next` edits and no job branch touches):
+Then **hand over to the human**: show them `decision.md`'s **In short**, **What
+each department did** and **Your decision** sections, and the **Commands**
+block exactly as written. Say plainly that nothing has been merged, and that
+after running the commands they run `/factory done <job-id>`. Don't run any of
+the commands yourself, even if asked to "just merge it" in passing: the
+commands are for the human to run.
 
-- `git branch --show-current` prints `main`
-- `git status --porcelain -- . ':!factory/backlog.md'` prints nothing
+### Needs human (build blocked)
 
-If not, set `stage: "needs-human"` and tell the user the job is approved but the
-main checkout is busy; they can run `/factory approve <job-id>` once it's clean.
-Otherwise:
-
-```bash
-git merge --no-ff factory/<job-id> -m "Merge factory/<job-id>"
-git worktree remove <worktree>
-git branch -d factory/<job-id>
-```
-
-Set `stage: "merged"`. If the merge fails, `git merge --abort`, set
-`needs-human` and explain. If only the worktree removal fails, the job is still
-merged; pass on the error. **Never push.** Pushing is the user's call.
-
-### Needs human
-
-Set `stage: "needs-human"`. Leave the branch and worktree in place. Tell the
-user the job id and worktree path, and quote `decision.md` (or the `## Blocked`
-section of `build.md`).
+When `build.md` says `STATUS: BLOCKED`, set `stage: "needs-human"`. Leave the
+branch and worktree in place. Tell the user the job id and worktree path, quote
+the `## Blocked` section, and suggest `/factory rework <job-id> <note>` once
+they've decided.
 
 ## /factory next
 
@@ -185,13 +184,24 @@ line changed under you (another session took it): re-read and try the next
 unchecked line. If there are none, say so and stop. Run `/factory <item>`, and
 once step 1 has the job id, replace `claimed` with it.
 
-## /factory approve <job-id>
+## /factory done <job-id>
 
-Only for a job in `needs-human`. Run **Merge** for it.
+The human says they have run the merge commands. Check it, but change nothing in
+git:
+
+1. Read the job's `job.json`. It must be in `ready` or `needs-human` and have a
+   `head`.
+2. `git merge-base --is-ancestor <head> main` must succeed (the job's commits
+   are in `main`). If it fails, say the merge isn't on `main` yet, point to the
+   **Commands** in `decision.md`, and stop.
+3. Set `stage: "merged"`. If `git worktree list` still shows the worktree, or
+   `git branch --list factory/<job-id>` still prints the branch, give the user
+   the cleanup commands from `decision.md` to run.
+4. Remind them that `main` is not pushed until they run `git push origin main`.
 
 ## /factory rework <job-id> <note>
 
-Only for a job in `needs-human`.
+Only for a job in `ready` or `needs-human`.
 
 1. Save the note verbatim as `rework-<k>.md` (next unused `k`).
 2. Set `stage: "build"`.
@@ -204,4 +214,5 @@ Only for a job in `needs-human`.
 
 Print one short line per transition, for example
 `004-contact-form: round 1 → security PASS, code CHANGES, ux/ui PASS → back to builder`.
-At the end, say whether the job merged or needs a human, and why.
+At the end, give the approver's recommendation and the merge commands (see
+**Approve**).

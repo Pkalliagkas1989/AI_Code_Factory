@@ -54,10 +54,36 @@ and its result, or what the page showed.
 
 ## Commit
 
-- Short one-line messages matching `git log --oneline`. One commit per logical
-  piece of work.
-- Stage explicit paths, never `git add -A`. Finish with a clean tree:
-  `git status --porcelain` prints nothing.
+Every commit message must be production-ready. Follow the project's convention
+when `CLAUDE.md` names one; otherwise use
+[Conventional Commits](https://www.conventionalcommits.org):
+
+```
+<type>(<scope>): <summary>
+
+<body>
+```
+
+- `type`: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `build`,
+  `ci` or `chore`. `scope`: the area touched, such as `auth` or `api`.
+- Summary: imperative mood ("add", not "added"), lower case, no trailing period,
+  at most 72 characters for the whole first line.
+- Body, after a blank line, wrapped at 72 characters: what changed and why.
+  Mention anything an operator must know: migrations, new environment
+  variables, new dependencies. Mark breaking changes with
+  `BREAKING CHANGE: <what breaks and how to migrate>`.
+- Never write vague messages such as "fix stuff", "wip", "updates" or
+  "address review comments". A fix after review says what it fixes:
+  `fix(auth): reject expired reset tokens`.
+
+Pass the message with `git commit -F - <<'MSG' ... MSG` so the body keeps its
+line breaks. One commit per logical piece of work. Stage explicit paths, never
+`git add -A`. Finish with a clean tree: `git status --porcelain` prints nothing.
+
+When a review asks you to reword commits, rewrite the branch's history. It
+belongs only to this job, so that is safe. Use `git commit --amend -F -` for the
+latest commit, or `git reset --soft main` and recommit in logical pieces with
+proper messages. Interactive commands such as `git rebase -i` are not available.
 
 ## build.md
 
