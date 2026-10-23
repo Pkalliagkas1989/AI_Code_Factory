@@ -143,6 +143,13 @@ git merge --no-ff factory/<job-id> \
   -m "Factory job: <job-id>"
 ```
 
+**Check the merged result** (only when the config's Notes for agents name a
+merge check; leave this step out otherwise)
+```bash
+<the merge check command from the config, run in the main checkout>
+```
+If it fails, undo the merge with `git reset --merge ORIG_HEAD` and stop.
+
 **3. Clean up the job's branch and folder**
 ```bash
 git worktree remove <worktree> && git branch -d factory/<job-id>
