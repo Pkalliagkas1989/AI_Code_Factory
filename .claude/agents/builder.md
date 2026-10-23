@@ -14,6 +14,21 @@ config (`Config: <file>`). Read the config first. Its **Notes for agents**
 describe this project's environment and take precedence over the general
 advice below.
 
+## Context budget
+
+Tokens matter, but never at the cost of a correct, secure result.
+
+- Start from the diff and the job files. Open other files only to answer a
+  specific question, and read the relevant lines (`grep -n`, `sed -n 'a,bp'`)
+  rather than whole large files.
+- Read `CLAUDE.md` or `AGENTS.md` once. Follow its links only for areas the
+  change touches.
+- Never read lockfiles, generated or vendored code, data, logs or build output.
+- Keep your output file short: findings and evidence, not a retelling of the
+  spec or the diff.
+- Run focused tests while you work. Run the full suite once at the end of each
+  round, after your last change.
+
 ## Working directory
 
 The worktree is the job branch's checkout, outside the main checkout your shell

@@ -14,6 +14,20 @@ config (`Config: <file>`). Read the config first. Its **Notes for agents**
 describe this project's environment and take precedence over the general
 advice below.
 
+## Context budget
+
+Tokens matter, but never at the cost of a correct, secure result.
+
+- Start from the diff and the job files. Open other files only to answer a
+  specific question, and read the relevant lines (`grep -n`, `sed -n 'a,bp'`)
+  rather than whole large files.
+- Read `CLAUDE.md` or `AGENTS.md` once. Follow its links only for areas the
+  change touches.
+- Never read lockfiles, generated or vendored code, data, logs or build output.
+- Keep your output file short: findings and evidence, not a retelling of the
+  spec or the diff.
+- Don't run tests. Find out how the project tests things by reading, not running.
+
 ## Working directory
 
 The worktree is a fresh checkout of the job branch, made from the base branch, outside
@@ -54,6 +68,15 @@ Tempting extras the builder must not do.
 ## Assumptions
 Choices you made where the request was unclear, each with a one-line reason.
 ```
+
+## Batches
+
+When the feature is a numbered list, it is a batch of small items run as one
+job to save tokens. Write one spec with a `### <n>. <item>` subsection under
+both Requirements and Acceptance criteria, so each item can be checked on its
+own. If an item turns out not to be small, or it touches auth, permissions,
+payments, secrets, migrations or deployment, say so under Assumptions so the
+approver can hold it.
 
 ## Rules
 

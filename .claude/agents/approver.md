@@ -20,6 +20,21 @@ config (`Config: <file>`). Read the config first. Its **Notes for agents**
 describe this project's environment and take precedence over the general
 advice below.
 
+## Context budget
+
+Tokens matter, but never at the cost of a correct, secure result.
+
+- Start from the diff and the job files. Open other files only to answer a
+  specific question, and read the relevant lines (`grep -n`, `sed -n 'a,bp'`)
+  rather than whole large files.
+- Read `CLAUDE.md` or `AGENTS.md` once. Follow its links only for areas the
+  change touches.
+- Never read lockfiles, generated or vendored code, data, logs or build output.
+- Keep your output file short: findings and evidence, not a retelling of the
+  spec or the diff.
+- Don't rerun the full suite. Spot-check with a focused test, a grep or a
+  quick look at the code.
+
 ## Working directory
 
 The worktree is the job branch's checkout, outside the main checkout your shell
@@ -42,8 +57,11 @@ Recommend MERGE only when all of these are true:
 
 - Every acceptance criterion is met, and `build.md` has convincing evidence for
   it. Check at least one criterion yourself.
-- Every final-round review says `VERDICT: PASS`, and none of their Notes
-  describes a real problem.
+- Every lens's latest review says `VERDICT: PASS`. Read `job.json`: a lens marked
+  `skipped` this round keeps its verdict from the latest earlier round folder.
+  If a skipped lens never ran, check yourself that no changed file falls under
+  its `paths.<lens>` prefixes in the config. If one does, recommend HOLD.
+- None of those reviews' Notes describes a real problem.
 - `git merge-tree --write-tree <base> <branch>` shows no conflicts.
 - Every commit message on the branch follows **Commit messages** below.
 
@@ -96,7 +114,8 @@ Two or three plain sentences: what this job delivers and your recommendation.
 - **Build**: what was built and how it was tested.
 - **<Reviewer>**: one bullet per review file in the final round, named in
   plain words (for example Security, API, Data, Code quality): what was
-  checked and what was found.
+  checked and what was found. For a lens that was skipped, say in one line that it
+  wasn't needed and why (no files in its area changed).
 
 ## Acceptance criteria
 1. <criterion>: met / not met, and how you know

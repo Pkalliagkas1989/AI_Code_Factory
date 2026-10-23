@@ -1,6 +1,6 @@
 ---
 name: factory
-description: Runs the AI code factory. Use when the user types /factory <feature>, /factory next, /factory done <job-id> or /factory rework <job-id> <note>. The session running it becomes the orchestrator of one job through spec → build → review → approve. The human always does the merge.
+description: Runs the AI code factory. Use when the user types /factory <feature>, /factory next [n], /factory done <job-id> or /factory rework <job-id> <note>. The session running it becomes the orchestrator of one job through spec → build → review → approve. The human always does the merge.
 ---
 
 # /factory: the orchestrator
@@ -52,6 +52,13 @@ Read `<repo>/factory/config.md` at the start of every command:
 - `reviewers`: the review lenses, in order. Each `<lens>` runs the agent
   `reviewer-<lens>`. Web apps use `security, ux, ui, code`; backends use
   `security, api, data, code`.
+- `always`: lenses that run in every round no matter what changed. Must
+  include `security` and `code`: security and code quality come first.
+- `paths.<lens>`: comma-separated path prefixes for a conditional lens (any
+  lens not in `always`). It runs only when a changed file starts with one of
+  them. A conditional lens with no `paths.` line always runs.
+- `light_paths`: path prefixes or `*.ext` patterns for changes that carry
+  little risk, such as docs. See **Choosing models**.
 - **Setup for a new worktree**: extra commands to run in each new worktree.
 - **Notes for agents**: the agents read these themselves.
 
@@ -95,7 +102,12 @@ Rewrite the whole file on every change:
 - `head`: added at the approve stage. The commit the branch pointed to when the
   approver ran (`git rev-parse factory/<job-id>`). `/factory done` uses it.
 - `round`: the current review round, or `0` before the first one.
-- `reviews`: the current round only. Each value is `pending`, `PASS` or `CHANGES`.
+- `reviews`: the current round only. Each value is `pending`, `PASS`, `CHANGES`
+  or `skipped` (not needed this round; see **Selecting reviewers**).
+- `reviewed`: the branch commit each round reviewed, such as `{"1": "5fe8659"}`.
+- `tokens`: tokens used per agent run, such as `{"spec-writer": 47430,
+  "builder r1": 48128, "security r1": 41378}`. Record each run's total when the
+  agent's result reports it. Leave it out when it isn't reported, and never guess.
   It has one key per lens in `reviewers`, in the same order; the dashboard takes
   the lens names from it.
 
@@ -146,22 +158,48 @@ The first line of `build.md` decides:
 
 ### Review round N
 
-1. Set `stage: "review"`, `round: N`, all reviews `pending`. Create `round-<N>/`.
-2. Spawn every reviewer in `reviewers` **in a single message** so they run in
-   parallel, each with `<paths> Review round N. Port: <port>.`
+1. Set `stage: "review"`, `round: N` and `reviewed.N` to
+   `git rev-parse factory/<job-id>`. Create `round-<N>/`. Decide which lenses run
+   (**Selecting reviewers**). Mark those `pending` and the rest `skipped`, and
+   tell the user in one line which lenses were skipped and why.
+2. Spawn every selected reviewer **in a single message** so they run in
+   parallel, each with `<paths> Review round N. Port: <port>.`, using the model
+   from **Choosing models**.
 3. **Wait for all of them.** As each one returns, read the first line of its file
    and record the verdict in `job.json` right away, so the dashboard updates
-   live. The round is over only when every lens's file exists. Never message the
+   live. The round is over only when every selected lens's file exists. Never message the
    builder mid-round. If a reviewer returns without its file, or its first line
    is not `VERDICT: PASS` or `VERDICT: CHANGES`, stop and tell the user.
 4. Then:
-   - **All PASS**: go to **Approve**.
+   - **All PASS** (skipped lenses count as passed): go to **Approve**.
    - **Any CHANGES, resumes left**: set `stage: "build"` and use `SendMessage`
      to `builder-<job-id>`:
      `Round N reviews are in <job folder>/round-<N>/. Fix every finding in the VERDICT: CHANGES files, commit, and update build.md for round N+1.`
      When it returns, do **Check the build**.
    - **Any CHANGES, no resumes left**: go to **Approve** anyway. The approver
      sees the open findings, recommends HOLD and explains them to the human.
+
+### Selecting reviewers
+
+Security and code quality come first, so skipping only ever applies to
+conditional lenses. When in doubt, run the lens.
+
+- Round 1: list the changed files with
+  `git diff --name-only <base>...factory/<job-id>`. Run every lens in `always`.
+  Run a conditional lens when any changed file starts with one of its
+  `paths.<lens>` prefixes, or when it has no `paths.` line. Skip it otherwise.
+- Round 2 and later: run every lens in `always` again, because fixes can
+  introduce new problems. Run a conditional lens again only when it said
+  `CHANGES` last round, or when the files changed since the last review
+  (`git diff --name-only <reviewed.(N-1)>..factory/<job-id>`) match its paths.
+  Otherwise mark it `skipped`. Its last verdict stands, and the approver reads
+  it from the earlier round folder.
+
+### Choosing models
+
+Each agent's file sets its model. There is one exception: when **every** changed
+file matches `light_paths`, spawn `reviewer-security` with `model: sonnet`
+instead of `opus`. Any code change, however small, keeps it on `opus`.
 
 ### Approve
 
@@ -187,13 +225,21 @@ branch and worktree in place. Tell the user the job id and worktree path, quote
 the `## Blocked` section, and suggest `/factory rework <job-id> <note>` once
 they've decided.
 
-## /factory next
+## /factory next [n]
 
 Take the first `- [ ]` line in `factory/backlog.md`. Claim it with a single Edit
 that turns that exact line into `- [x] <item> → claimed`. If the Edit fails, the
 line changed under you (another session took it): re-read and try the next
 unchecked line. If there are none, say so and stop. Run `/factory <item>`, and
 once step 1 has the job id, replace `claimed` with it.
+
+**Batching** (`n` from 2 to 3) saves the per-agent startup cost on small fixes.
+Claim up to `n` unchecked items one at a time, as above, and run them as **one**
+job. The feature text is the items as a numbered list, and the slug describes
+the group. Batch only items that are each small and that touch related code.
+Never batch an item about auth, permissions, payments, secrets, migrations or
+deployment: run it alone, so its review is not diluted. If any item is like
+that, claim it as a job of its own and tell the user.
 
 ## /factory done <job-id>
 

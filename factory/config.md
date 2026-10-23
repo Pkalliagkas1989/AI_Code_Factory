@@ -1,27 +1,34 @@
 # Factory config
 
-Settings for this project. The orchestrator and every agent read this file.
+Settings for this project. The orchestrator and every agent read this file,
+so keep it short.
 
 base_branch: main
 reviewers: security, ux, ui, code
+always: security, code
+paths.ux: src/
+paths.ui: src/
+light_paths: *.md, docs/
 
 <!--
 base_branch  The branch jobs start from and merge back into.
-reviewers    Comma-separated review lenses, each matching
-             .claude/agents/reviewer-<lens>.md. All of them run in parallel.
-             Web apps: security, ux, ui, code
-             Backends: security, api, data, code
+reviewers    Review lenses, each matching .claude/agents/reviewer-<lens>.md.
+             Web apps: security, ux, ui, code. Backends: security, api, data, code.
+always       Lenses that run in every round. Keep security and code here.
+paths.<lens> Path prefixes. A conditional lens runs only when a changed file
+             starts with one of them. Without a paths line, it always runs.
+light_paths  Low-risk changes. When every changed file matches, the security
+             review uses Sonnet instead of Opus. It still runs.
 -->
 
 ## Setup for a new worktree
 
-Commands the orchestrator runs inside every new worktree, after
-`CLAUDE.md`'s own fresh-checkout setup. Leave empty if there are none.
+Commands the orchestrator runs inside every new worktree, after `CLAUDE.md`'s
+fresh-checkout setup. Leave empty if there are none.
 
 ```bash
 ```
 
 ## Notes for agents
 
-Project facts every agent must know that `CLAUDE.md` doesn't say, for example
-where the Python environment lives or which commands must never run.
+Project facts every agent needs that `CLAUDE.md` doesn't say.

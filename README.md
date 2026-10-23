@@ -69,11 +69,32 @@ templates/
   `factory/<job-id>` branch. Open several Claude sessions and run `/factory` in
   each to build features in parallel.
 
+## Security first, then tokens
+
+Every agent has a fixed start-up cost of roughly 40k tokens (its
+instructions, the project docs, the diff), so the factory saves tokens by
+running fewer and leaner agents, never by checking less:
+
+- **Security and code review always run**, in every round. API, data, UX and UI
+  reviews run only when the job changes files in their area
+  (`paths.<lens>` in `factory/config.md`). When in doubt, they run.
+- **Later rounds** re-run security and code, plus only the reviewers that asked
+  for changes or whose area the fixes touched.
+- **Security stays on Opus** for any code change. It drops to Sonnet only when a
+  job changes nothing but docs (`light_paths`).
+- **Batching:** `/factory next 3` runs up to three small backlog items as one
+  job. Auth, permissions, payments, secrets, migrations and deployment items
+  always run alone.
+- **Context budget:** agents start from the diff, read only the lines they need,
+  and only the builder and the code reviewer run the full test suite.
+- **Visible cost:** the orchestrator records each agent's tokens in `job.json`,
+  and the dashboard shows the total on each card.
+
 ## Commands
 
 ```
 /factory <feature>               run a new feature through the loop
-/factory next                    run the first unchecked item in factory/backlog.md
+/factory next [n]                run the next backlog item (or batch up to 3 small ones)
 /factory done <job-id>           after you ran the merge commands: verify and mark merged
 /factory rework <job-id> <note>  send a waiting job back to the builder with feedback
 ```
