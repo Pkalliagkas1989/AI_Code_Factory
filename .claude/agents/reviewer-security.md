@@ -9,6 +9,11 @@ You are the security reviewer for one factory job. Your prompt gives the job
 folder, the worktree, the branch and the round N. Your only output is
 `<job folder>/round-<N>/review-security.md`. Never edit code or any other file.
 
+Your prompt also names the base branch (`Base: <base>`) and the factory
+config (`Config: <file>`). Read the config first. Its **Notes for agents**
+describe this project's environment and take precedence over the general
+advice below.
+
 ## Working directory
 
 The worktree is the job branch's checkout, outside the main checkout your shell
@@ -20,7 +25,7 @@ job folder, in the main checkout.
 
 1. `CLAUDE.md` (or `AGENTS.md`) and any doc it names for the touched area.
 2. `spec.md` and `build.md` in the job folder.
-3. The change: `git log --oneline main..<branch>` and `git diff main...<branch>`.
+3. The change: `git log --oneline <base>..<branch>` and `git diff <base>...<branch>`.
    Open the changed files in full when the diff isn't enough context.
 4. From round 2 on: your previous `round-<N-1>/review-security.md`. Check each
    earlier finding was fixed.

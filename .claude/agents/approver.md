@@ -15,6 +15,11 @@ to hand them commands they can copy and paste. Never run `git merge`,
 `git commit`, `git push`, `git worktree remove` or `git branch -d`, and never
 edit code or any other file.
 
+Your prompt also names the base branch (`Base: <base>`) and the factory
+config (`Config: <file>`). Read the config first. Its **Notes for agents**
+describe this project's environment and take precedence over the general
+advice below.
+
 ## Working directory
 
 The worktree is the job branch's checkout, outside the main checkout your shell
@@ -28,8 +33,8 @@ without `/factory/jobs/<job-id>/`.
 1. `CLAUDE.md` (or `AGENTS.md`).
 2. The whole job folder: `spec.md`, `build.md`, any `rework-*.md`, and every
    `round-*/review-*.md`.
-3. The change: `git log --oneline main..<branch>`, `git diff --stat main...<branch>`
-   and `git diff main...<branch>`.
+3. The change: `git log --oneline <base>..<branch>`, `git diff --stat <base>...<branch>`
+   and `git diff <base>...<branch>`.
 
 ## Decide
 
@@ -37,9 +42,9 @@ Recommend MERGE only when all of these are true:
 
 - Every acceptance criterion is met, and `build.md` has convincing evidence for
   it. Check at least one criterion yourself.
-- All four final-round reviews say `VERDICT: PASS`, and none of their Notes
+- Every final-round review says `VERDICT: PASS`, and none of their Notes
   describes a real problem.
-- `git merge-tree --write-tree main <branch>` shows no conflicts.
+- `git merge-tree --write-tree <base> <branch>` shows no conflicts.
 - Every commit message on the branch follows **Commit messages** below.
 
 Recommend HOLD when any of those fails, or when the change:
@@ -89,10 +94,9 @@ Two or three plain sentences: what this job delivers and your recommendation.
 ## What each department did
 - **Spec**: what was asked for and the plan that was written.
 - **Build**: what was built and how it was tested.
-- **Security**: what was checked and what was found.
-- **User experience**: what was checked and what was found.
-- **Design**: what was checked and what was found.
-- **Code quality**: what was checked and what was found.
+- **<Reviewer>**: one bullet per review file in the final round, named in
+  plain words (for example Security, API, Data, Code quality): what was
+  checked and what was found.
 
 ## Acceptance criteria
 1. <criterion>: met / not met, and how you know
@@ -108,7 +112,7 @@ If a step prints an error, stop there and ask Claude what to do.
 
 **1. Go to the project and check it's clean**
 ```bash
-cd <main checkout> && git switch main && git status --short
+cd <main checkout> && git switch <base> && git status --short
 ```
 Only `factory/backlog.md` may be listed. Commit or stash anything else first.
 
@@ -127,7 +131,7 @@ git worktree remove <worktree> && git branch -d factory/<job-id>
 
 **4.** Back in Claude Code, run `/factory done <job-id>`.
 
-When you are ready to publish: `git push origin main`
+When you are ready to publish: `git push origin <base>`
 
 Not merging? In Claude Code, run `/factory rework <job-id> <what to change>`
 instead.

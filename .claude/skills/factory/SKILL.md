@@ -12,10 +12,10 @@ wrote and decide the next step. You are the only one who writes the job's
 ## The pipeline
 
 ```
-request ─► spec-writer ─► builder ─► ┌ reviewer-security ┐
-                             ▲       │ reviewer-ux       │ all four finish
-                             │       │ reviewer-ui       ├───────────────┐
-                             │       └ reviewer-code     ┘               │
+request ─► spec-writer ─► builder ─► ┌ reviewer-<lens 1> ┐
+                             ▲       │ reviewer-<lens 2> │ all of them finish
+                             │       │ ...               ├───────────────┐
+                             │       └ reviewer-<lens k> ┘               │
                              │                                           ▼
                              └──── someone asked for CHANGES ◄──── round result
                                    (at most 2 extra rounds)              │ all PASS
@@ -38,18 +38,25 @@ the commands in `decision.md`; the human reads them and runs them.
 | ------- | ----------------------- | --------------------------------------------- |
 | spec    | `spec-writer`           | `spec.md`                                     |
 | build   | `builder`               | `build.md`, plus commits on `factory/<job-id>`|
-| review  | `reviewer-security`     | `round-<N>/review-security.md`                |
-|         | `reviewer-ux`           | `round-<N>/review-ux.md`                      |
-|         | `reviewer-ui`           | `round-<N>/review-ui.md`                      |
-|         | `reviewer-code`         | `round-<N>/review-code.md`                    |
+| review  | `reviewer-<lens>`       | `round-<N>/review-<lens>.md`, one per lens    |
 | approve | `approver`              | `decision.md`                                 |
 
 `MAX_RESUMES = 2`. After round 1 the builder may be sent back at most twice, so
 a job has at most three review rounds.
 
-All project knowledge (install, dev server, tests, lint, conventions) comes from
-the target repo's `CLAUDE.md` (or `AGENTS.md`). Nothing project-specific lives in
-the factory files.
+## Config
+
+Read `<repo>/factory/config.md` at the start of every command:
+
+- `base_branch` (`<base>` below): where jobs start and where they merge back.
+- `reviewers`: the review lenses, in order. Each `<lens>` runs the agent
+  `reviewer-<lens>`. Web apps use `security, ux, ui, code`; backends use
+  `security, api, data, code`.
+- **Setup for a new worktree**: extra commands to run in each new worktree.
+- **Notes for agents**: the agents read these themselves.
+
+All other project knowledge (install, dev server, tests, lint, conventions)
+comes from the target repo's `CLAUDE.md` (or `AGENTS.md`).
 
 ## Paths
 
@@ -89,16 +96,19 @@ Rewrite the whole file on every change:
   approver ran (`git rev-parse factory/<job-id>`). `/factory done` uses it.
 - `round`: the current review round, or `0` before the first one.
 - `reviews`: the current round only. Each value is `pending`, `PASS` or `CHANGES`.
+  It has one key per lens in `reviewers`, in the same order; the dashboard takes
+  the lens names from it.
 
 ### Agent prompts
 
 Every prompt begins with:
-`Job folder: <job folder>. Worktree: <worktree>. Branch: factory/<job-id>.`
+`Job folder: <job folder>. Worktree: <worktree>. Branch: factory/<job-id>. Base: <base>. Config: <repo>/factory/config.md.`
 Below, this sentence is written `<paths>`.
 
-Agents that run the app get their own port so parallel jobs never collide. With
-`n` the job number as an integer (`004` → 4): builder `5100 + 10n`,
-`reviewer-ux` `5101 + 10n`, `reviewer-ui` `5102 + 10n`. Append ` Port: <port>.`
+Every agent that might run the app gets its own port, so parallel jobs never
+collide. With `n` the job number as an integer (`004` → 4): the builder gets
+`5100 + 10n` and the reviewer at position `i` in `reviewers` (starting at 0)
+gets `5101 + 10n + i`. Append ` Port: <port>.`
 
 ## Parallel jobs
 
@@ -115,12 +125,13 @@ main checkout belongs to the user: you never change its code or its git state.
    (without `-p`). If that fails, another session got there first: take the
    next number and retry. Write `job.json` with `stage: "spec"`, `round: 0` and
    every review `pending`.
-2. **Create the worktree** from `main`:
+2. **Create the worktree** from `<base>`:
    ```bash
-   git worktree add -b factory/<job-id> <worktree> main
+   git worktree add -b factory/<job-id> <worktree> <base>
    ```
-   Run the fresh-checkout setup from `CLAUDE.md` inside the worktree. If any
-   step fails, stop and tell the user.
+   Inside the worktree, run the fresh-checkout setup from `CLAUDE.md`, then the
+   config's **Setup for a new worktree**. If any step fails, stop and tell the
+   user.
 3. **Spec.** Spawn `spec-writer` with `<paths> Feature: <feature, verbatim>`.
    When it returns, confirm `spec.md` exists.
 4. **Build.** Set `stage: "build"`. Spawn `builder` **named `builder-<job-id>`**
@@ -136,11 +147,11 @@ The first line of `build.md` decides:
 ### Review round N
 
 1. Set `stage: "review"`, `round: N`, all reviews `pending`. Create `round-<N>/`.
-2. Spawn the four reviewers **in a single message** so they run in parallel,
-   each with `<paths> Review round N.` (plus the port for ux and ui).
-3. **Wait for all four.** As each one returns, read the first line of its file
+2. Spawn every reviewer in `reviewers` **in a single message** so they run in
+   parallel, each with `<paths> Review round N. Port: <port>.`
+3. **Wait for all of them.** As each one returns, read the first line of its file
    and record the verdict in `job.json` right away, so the dashboard updates
-   live. The round is over only when all four files exist. Never message the
+   live. The round is over only when every lens's file exists. Never message the
    builder mid-round. If a reviewer returns without its file, or its first line
    is not `VERDICT: PASS` or `VERDICT: CHANGES`, stop and tell the user.
 4. Then:
@@ -191,13 +202,13 @@ git:
 
 1. Read the job's `job.json`. It must be in `ready` or `needs-human` and have a
    `head`.
-2. `git merge-base --is-ancestor <head> main` must succeed (the job's commits
-   are in `main`). If it fails, say the merge isn't on `main` yet, point to the
+2. `git merge-base --is-ancestor <head> <base>` must succeed (the job's commits
+   are in `<base>`). If it fails, say the merge isn't on `<base>` yet, point to the
    **Commands** in `decision.md`, and stop.
 3. Set `stage: "merged"`. If `git worktree list` still shows the worktree, or
    `git branch --list factory/<job-id>` still prints the branch, give the user
    the cleanup commands from `decision.md` to run.
-4. Remind them that `main` is not pushed until they run `git push origin main`.
+4. Remind them that `<base>` is not pushed until they run `git push origin <base>`.
 
 ## /factory rework <job-id> <note>
 

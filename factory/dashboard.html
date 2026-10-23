@@ -67,7 +67,6 @@
 <script>
 const STAGES = ['spec', 'build', 'review', 'approve', 'ready', 'needs-human', 'merged']
 const LABELS = { ready: 'ready to merge', 'needs-human': 'needs you' }
-const LENSES = ['security', 'ux', 'ui', 'code']
 
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
@@ -101,7 +100,7 @@ async function loadRounds(job) {
   for (let n = 1; n <= job.round; n++) {
     if (n === job.round) { rounds.push(job.reviews); continue }
     const r = {}
-    for (const k of LENSES) {
+    for (const k of Object.keys(job.reviews)) {
       try { r[k] = /^VERDICT:\s*(PASS|CHANGES)/.exec(await get(`jobs/${job.id}/round-${n}/review-${k}.md`))?.[1] ?? 'pending' }
       catch { r[k] = 'pending' }
     }
@@ -112,7 +111,7 @@ async function loadRounds(job) {
 
 function card(job) {
   const rounds = job.rounds.map((r, i) =>
-    `<div class="round"><span class="n">R${i + 1}</span>${LENSES.map((k) => `<span class="chip ${r[k]}">${k}</span>`).join('')}</div>`
+    `<div class="round"><span class="n">R${i + 1}</span>${Object.keys(job.reviews).map((k) => `<span class="chip ${r[k]}">${k}</span>`).join('')}</div>`
   ).join('')
   return `<div class="card ${['ready', 'needs-human'].includes(job.stage) ? 'human' : ''}" tabindex="0" data-id="${esc(job.id)}">
     <div class="id">${esc(job.id)}</div><div class="feat">${esc(job.feature || '')}</div>${rounds}</div>`

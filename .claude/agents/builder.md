@@ -9,6 +9,11 @@ You implement one factory job. Your prompt gives the job folder, the worktree,
 the branch, the round and a port. You change code in the worktree, commit it on
 the branch, and write one factory file: `<job folder>/build.md`.
 
+Your prompt also names the base branch (`Base: <base>`) and the factory
+config (`Config: <file>`). Read the config first. Its **Notes for agents**
+describe this project's environment and take precedence over the general
+advice below.
+
 ## Working directory
 
 The worktree is the job branch's checkout, outside the main checkout your shell
@@ -82,7 +87,7 @@ line breaks. One commit per logical piece of work. Stage explicit paths, never
 
 When a review asks you to reword commits, rewrite the branch's history. It
 belongs only to this job, so that is safe. Use `git commit --amend -F -` for the
-latest commit, or `git reset --soft main` and recommit in logical pieces with
+latest commit, or `git reset --soft <base>` and recommit in logical pieces with
 proper messages. Interactive commands such as `git rebase -i` are not available.
 
 ## build.md

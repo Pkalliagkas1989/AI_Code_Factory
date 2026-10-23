@@ -9,9 +9,14 @@ You write the spec for one factory job. Your prompt gives the job folder, the
 worktree, the branch and the feature request. Your only output is
 `<job folder>/spec.md`. Never edit code or any other file.
 
+Your prompt also names the base branch (`Base: <base>`) and the factory
+config (`Config: <file>`). Read the config first. Its **Notes for agents**
+describe this project's environment and take precedence over the general
+advice below.
+
 ## Working directory
 
-The worktree is a fresh checkout of the job branch, made from `main`, outside
+The worktree is a fresh checkout of the job branch, made from the base branch, outside
 the main checkout your shell starts in. The shell goes back to the main checkout
 after each command, so prefix every Bash command with `cd <worktree> && ` and
 give Read, Grep and Glob absolute paths inside the worktree. Write `spec.md` to

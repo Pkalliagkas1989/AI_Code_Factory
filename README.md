@@ -32,8 +32,11 @@ All files here were written for this repo.
     reviewer-ux.md            sonnet   → round-N/review-ux.md
     reviewer-ui.md            sonnet   → round-N/review-ui.md
     reviewer-code.md          sonnet   → round-N/review-code.md
+    reviewer-api.md           sonnet   → round-N/review-api.md   (backends)
+    reviewer-data.md          sonnet   → round-N/review-data.md  (backends)
     approver.md               opus     → decision.md (report + merge commands)
 factory/
+  config.md                   base branch, reviewers, environment notes
   backlog.md                  feature queue for /factory next
   dashboard.html              live board of all jobs
   jobs/                       runtime state, one folder per job (gitignored)
@@ -48,7 +51,7 @@ templates/
 - Agents don't share a conversation. They read files, and each writes **one**
   file. Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; the decision
   starts with `RECOMMEND: MERGE` or `RECOMMEND: HOLD`.
-- The four reviewers run **in parallel**. When any of them asks for changes, the
+- The reviewers run **in parallel**. Which ones run is set in `factory/config.md`. When any of them asks for changes, the
   same builder is resumed with their feedback.
 - The approver writes `decision.md`: a short plain-language summary of what
   each department (spec, build, security, UX, design, code) did, a
@@ -86,10 +89,13 @@ templates/
 3. Copy `templates/CLAUDE.md` to the project root (or merge it into the existing
    one) and fill it in. Agents learn the setup, dev server, tests and
    conventions from it, and nothing else.
-4. If the project has pages to look at, install
+4. Edit `factory/config.md`: the base branch, the reviewers
+   (`security, ux, ui, code` for web apps, `security, api, data, code` for
+   backends), and any environment notes the agents need.
+5. If the project has pages to look at, install
    [`agent-browser`](https://github.com/vercel-labs/agent-browser) so the
    builder and the UX/UI reviewers can see the running app.
-5. Commit on `main`, open Claude Code in the project and run `/factory <feature>`.
+6. Commit on the base branch, open Claude Code in the project and run `/factory <feature>`.
 
 The review checklists are general on purpose. Ask Claude to tailor them to your
 stack once you know what matters most.
