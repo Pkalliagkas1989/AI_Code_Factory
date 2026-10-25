@@ -27,7 +27,10 @@ All files here were written for this repo.
 
 ```
 .claude/
-  skills/factory/SKILL.md     orchestrator: runs the loop, owns each job.json
+  skills/factory/
+    SKILL.md                  orchestrator: runs the loop
+    scripts/factory.py        job ids, worktrees, reviewer choice, job.json updates
+    references/               next/done/rework steps, job.json and selection rules
   agents/
     spec-writer.md            opus     → spec.md
     builder.md                opus     → code commits + build.md
@@ -50,7 +53,10 @@ templates/
 ## How it works
 
 - The Claude session that runs `/factory` is the **orchestrator**. It starts
-  every agent and is the only writer of the job's `job.json`.
+  every agent and is the only writer of the job's `job.json`, always through
+  `scripts/factory.py`. The script does the mechanical steps (claiming a job
+  id, picking reviewers, checking each file's first line) the same way every
+  time, so they don't depend on how the instructions are read.
 - Agents don't share a conversation. They read files, and each writes **one**
   file. Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; the decision
   starts with `RECOMMEND: MERGE` or `RECOMMEND: HOLD`.

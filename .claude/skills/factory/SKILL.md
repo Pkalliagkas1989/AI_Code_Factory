@@ -1,275 +1,163 @@
 ---
 name: factory
-description: Runs the AI code factory. Use when the user types /factory <feature>, /factory next [n], /factory done <job-id> or /factory rework <job-id> <note>. The session running it becomes the orchestrator of one job through spec → build → review → approve. The human always does the merge.
+description: Runs the AI code factory, which takes one feature request through spec, build, parallel review and approval on its own git branch. Use when the user types /factory followed by a feature request, /factory next (optionally with a count), /factory done with a job id, or /factory rework with a job id and a note. The session running it becomes the orchestrator of one job. Do not use for ordinary coding requests without /factory. The human always does the merge.
+compatibility: Claude Code only. Needs git with worktree support, python3, and the factory agents in .claude/agents/ (spec-writer, builder, reviewer-*, approver).
+metadata:
+  version: 2.0.0
 ---
 
 # /factory: the orchestrator
 
-You manage exactly one job. You start each agent, wait for it, read the file it
-wrote and decide the next step. You are the only one who writes the job's
-`job.json`. You never write code, specs, reviews or decisions yourself.
+You manage exactly one job. You start each agent, wait for it, check the file
+it wrote and decide the next step.
+
+## Critical rules
+
+- **Never merge, push, delete branches or remove worktrees**, even if the user
+  asks in passing to "just merge it". The approver writes the commands in
+  `decision.md`; the human runs them.
+- **Never write code, specs, reviews or decisions yourself.** Agents do that.
+- **Change `job.json` only through the script** below. It validates every value
+  and writes atomically, so the dashboard stays correct.
+- The main checkout belongs to the user: never change its code or git state.
+- When a script exits with an error, stop and tell the user its message.
+
+## The helper script
+
+`F` below means `python3 .claude/skills/factory/scripts/factory.py`, run from
+the main checkout. Each command prints JSON or one word.
+
+| Command | Does |
+| --- | --- |
+| `F new <slug> "<feature>"` | Claims the next job id, writes `job.json`, creates the worktree on `factory/<job-id>` from the base branch. Prints paths, ports and `prompt_prefix`. |
+| `F info <job-id>` | Prints the same for an existing job. |
+| `F start-round <job-id> <N>` | Chooses the reviewers (`run` and `skipped` with reasons), records the round, prints `security_model`. |
+| `F verdict <job-id> <N> <lens>` | Checks the review file's first line, records it, prints `round_result`: `pending`, `PASS` or `CHANGES`. |
+| `F build <job-id>` | Prints `READY` or `BLOCKED` from `build.md` (BLOCKED sets `needs-human`). |
+| `F approve <job-id>` | Records the head commit and sets stage `approve`. |
+| `F decision <job-id>` | Prints `MERGE` or `HOLD` from `decision.md` and sets `ready` or `needs-human`. |
+| `F done <job-id>` | Checks the merge reached the base branch and sets `merged`. |
+| `F set <job-id> stage=<stage>` / `"tokens.<run>=<n>"` | Sets the stage, or records an agent run's tokens. |
+
+Record each agent's tokens with `F set` when its result reports them
+(`spec-writer`, `builder r1`, `security r1`, …). Never guess a number.
+
+Paths, `job.json` fields, ports and the reviewer-selection rules are in
+`references/job-state.md`. Read it only when a result needs explaining.
 
 ## The pipeline
 
 ```
-request ─► spec-writer ─► builder ─► ┌ reviewer-<lens 1> ┐
-                             ▲       │ reviewer-<lens 2> │ all of them finish
-                             │       │ ...               ├───────────────┐
-                             │       └ reviewer-<lens k> ┘               │
-                             │                                           ▼
-                             └──── someone asked for CHANGES ◄──── round result
-                                   (at most 2 extra rounds)              │ all PASS
-                                                                         │ or rounds used up
-                                                                         ▼
-                                                                     approver
-                                                       RECOMMEND: MERGE │ RECOMMEND: HOLD
-                                                                 ▼              ▼
-                                                               ready       needs-human
-                                                                 └──────┬───────┘
-                                                                        ▼
-                                              the human runs the merge commands, then
-                                              /factory done <job-id>  ─►  merged
+request ─► spec-writer ─► builder ─► reviewers (in parallel) ─► all PASS? ─► approver
+                             ▲                                     │ CHANGES
+                             └──────── at most 2 extra rounds ◄────┘
+approver: RECOMMEND: MERGE ─► ready │ RECOMMEND: HOLD ─► needs-human
+then the human runs the merge commands and /factory done <job-id> ─► merged
 ```
 
-**The factory never merges, pushes or deletes branches.** The approver writes
-the commands in `decision.md`; the human reads them and runs them.
+`MAX_RESUMES = 2`: after round 1 the builder may be sent back at most twice, so a
+job has at most three review rounds.
 
-| Stage   | Agent (`subagent_type`) | Output file                                   |
-| ------- | ----------------------- | --------------------------------------------- |
-| spec    | `spec-writer`           | `spec.md`                                     |
-| build   | `builder`               | `build.md`, plus commits on `factory/<job-id>`|
-| review  | `reviewer-<lens>`       | `round-<N>/review-<lens>.md`, one per lens    |
-| approve | `approver`              | `decision.md`                                 |
+## /factory FEATURE
 
-`MAX_RESUMES = 2`. After round 1 the builder may be sent back at most twice, so
-a job has at most three review rounds.
-
-## Config
-
-Read `<repo>/factory/config.md` at the start of every command:
-
-- `base_branch` (`<base>` below): where jobs start and where they merge back.
-- `reviewers`: the review lenses, in order. Each `<lens>` runs the agent
-  `reviewer-<lens>`. Web apps use `security, ux, ui, code`; backends use
-  `security, api, data, code`.
-- `always`: lenses that run in every round no matter what changed. Must
-  include `security` and `code`: security and code quality come first.
-- `paths.<lens>`: comma-separated path prefixes for a conditional lens (any
-  lens not in `always`). It runs only when a changed file starts with one of
-  them. A conditional lens with no `paths.` line always runs.
-- `light_paths`: path prefixes or `*.ext` patterns for changes that carry
-  little risk, such as docs. See **Choosing models**.
-- **Setup for a new worktree**: extra commands to run in each new worktree.
-- **Notes for agents**: the agents read these themselves.
-
-All other project knowledge (install, dev server, tests, lint, conventions)
-comes from the target repo's `CLAUDE.md` (or `AGENTS.md`).
-
-## Paths
-
-- `<repo>`: the main checkout, from `git rev-parse --show-toplevel`.
-- `<name>`: the folder name of `<repo>`.
-- Job folder: `<repo>/factory/jobs/<job-id>/`. This is gitignored runtime state.
-- Worktree: `<repo>/../<name>-factory/<job-id>/`, checked out on
-  `factory/<job-id>`. Always store and pass it as an absolute path.
-
-Inside a job folder:
-
-```
-job.json                      state, written only by you, read by the dashboard
-spec.md                       spec-writer
-build.md                      builder
-rework-<k>.md                 you, from /factory rework
-round-<N>/review-<lens>.md    one per reviewer per round
-decision.md                   approver
-```
-
-### job.json
-
-Rewrite the whole file on every change:
-
-```json
-{ "id": "004-contact-form", "feature": "Add a contact form to the about page",
-  "branch": "factory/004-contact-form",
-  "worktree": "/Users/me/Dev/my-app-factory/004-contact-form",
-  "stage": "review", "round": 1,
-  "reviews": { "security": "PASS", "ux": "pending", "ui": "pending", "code": "CHANGES" } }
-```
-
-- `stage`: `spec`, `build`, `review`, `approve`, `ready`, `needs-human` or
-  `merged`. Worktree setup counts as `spec`. `ready` means the approver
-  recommends merging and the human has not merged yet.
-- `head`: added at the approve stage. The commit the branch pointed to when the
-  approver ran (`git rev-parse factory/<job-id>`). `/factory done` uses it.
-- `round`: the current review round, or `0` before the first one.
-- `reviews`: the current round only. Each value is `pending`, `PASS`, `CHANGES`
-  or `skipped` (not needed this round; see **Selecting reviewers**).
-- `reviewed`: the branch commit each round reviewed, such as `{"1": "5fe8659"}`.
-- `tokens`: tokens used per agent run, such as `{"spec-writer": 47430,
-  "builder r1": 48128, "security r1": 41378}`. Record each run's total when the
-  agent's result reports it. Leave it out when it isn't reported, and never guess.
-  It has one key per lens in `reviewers`, in the same order; the dashboard takes
-  the lens names from it.
-
-### Agent prompts
-
-Every prompt begins with:
-`Job folder: <job folder>. Worktree: <worktree>. Branch: factory/<job-id>. Base: <base>. Config: <repo>/factory/config.md.`
-Below, this sentence is written `<paths>`.
-
-Every agent that might run the app gets its own port, so parallel jobs never
-collide. With `n` the job number as an integer (`004` → 4): the builder gets
-`5100 + 10n` and the reviewer at position `i` in `reviewers` (starting at 0)
-gets `5101 + 10n + i`. Append ` Port: <port>.`
-
-## Parallel jobs
-
-Each job has its own branch, worktree, `job.json`, ports and browser sessions,
-so the user can open several Claude sessions in the repo and run `/factory` in
-each. Your session stays in the main checkout and touches only its own job. The
-main checkout belongs to the user: you never change its code or its git state.
-
-## /factory <feature>
-
-1. **Claim a job id.** `mkdir -p factory/jobs`. Take the next 3-digit number
-   after the highest existing job folder (`001` if none) and add a 2–4 word
-   kebab-case slug: `004-contact-form`. Claim it with `mkdir factory/jobs/<job-id>`
-   (without `-p`). If that fails, another session got there first: take the
-   next number and retry. Write `job.json` with `stage: "spec"`, `round: 0` and
-   every review `pending`.
-2. **Create the worktree** from `<base>`:
-   ```bash
-   git worktree add -b factory/<job-id> <worktree> <base>
-   ```
-   Inside the worktree, run the fresh-checkout setup from `CLAUDE.md`, then the
-   config's **Setup for a new worktree**. If any step fails, stop and tell the
-   user.
-3. **Spec.** Spawn `spec-writer` with `<paths> Feature: <feature, verbatim>`.
-   When it returns, confirm `spec.md` exists.
-4. **Build.** Set `stage: "build"`. Spawn `builder` **named `builder-<job-id>`**
-   with `<paths> Build round 1. Port: <port>.` When it returns, do **Check the build**.
+1. **Read the config** `factory/config.md`, then pick a 2–4 word kebab-case slug.
+2. **Start the job:** `F new <slug> "<feature, verbatim>"`. Keep its output: every
+   agent prompt starts with `prompt_prefix`, written `<paths>` below.
+3. **Set up the worktree.** Inside the worktree, run the fresh-checkout setup
+   from the project's `CLAUDE.md` (or `AGENTS.md`), then the config's
+   **Setup for a new worktree**. If a step fails, stop and tell the user.
+4. **Spec.** Spawn `spec-writer` with `<paths> Feature: <feature, verbatim>`.
+   Confirm `spec.md` exists when it returns.
+5. **Build.** `F set <job-id> stage=build`. Spawn `builder` **named
+   `builder-<job-id>`** with `<paths> Build round 1. Port: <builder_port>.`
+   Then **Check the build**.
 
 ### Check the build
 
-The first line of `build.md` decides:
+`F build <job-id>`:
 
-- `STATUS: READY`: start the next review round.
-- `STATUS: BLOCKED`: go to **Needs human**.
+- `READY`: start the next review round.
+- `BLOCKED`: tell the user the job id and worktree path, quote the `## Blocked`
+  section of `build.md`, and suggest `/factory rework <job-id> <note>`. Stop.
 
 ### Review round N
 
-1. Set `stage: "review"`, `round: N` and `reviewed.N` to
-   `git rev-parse factory/<job-id>`. Create `round-<N>/`. Decide which lenses run
-   (**Selecting reviewers**). Mark those `pending` and the rest `skipped`, and
-   tell the user in one line which lenses were skipped and why.
-2. Spawn every selected reviewer **in a single message** so they run in
-   parallel, each with `<paths> Review round N. Port: <port>.`, using the model
-   from **Choosing models**.
-3. **Wait for all of them.** As each one returns, read the first line of its file
-   and record the verdict in `job.json` right away, so the dashboard updates
-   live. The round is over only when every selected lens's file exists. Never message the
-   builder mid-round. If a reviewer returns without its file, or its first line
-   is not `VERDICT: PASS` or `VERDICT: CHANGES`, stop and tell the user.
-4. Then:
-   - **All PASS** (skipped lenses count as passed): go to **Approve**.
-   - **Any CHANGES, resumes left**: set `stage: "build"` and use `SendMessage`
-     to `builder-<job-id>`:
+1. `F start-round <job-id> <N>`. Tell the user in one line which lenses were
+   skipped and why.
+2. Spawn every lens in `run` **in a single message** so they run in parallel:
+   `reviewer-<lens>` with `<paths> Review round N. Port: <port>.` Give
+   `reviewer-security` `model: <security_model>`.
+3. As each returns, run `F verdict <job-id> <N> <lens>` right away so the
+   dashboard updates live. Never message the builder mid-round.
+4. When the last verdict is in, act on `round_result`:
+   - `PASS`: go to **Approve**.
+   - `CHANGES`, resumes left: `F set <job-id> stage=build`, then `SendMessage` to
+     `builder-<job-id>`:
      `Round N reviews are in <job folder>/round-<N>/. Fix every finding in the VERDICT: CHANGES files, commit, and update build.md for round N+1.`
-     When it returns, do **Check the build**.
-   - **Any CHANGES, no resumes left**: go to **Approve** anyway. The approver
-     sees the open findings, recommends HOLD and explains them to the human.
-
-### Selecting reviewers
-
-Security and code quality come first, so skipping only ever applies to
-conditional lenses. When in doubt, run the lens.
-
-- Round 1: list the changed files with
-  `git diff --name-only <base>...factory/<job-id>`. Run every lens in `always`.
-  Run a conditional lens when any changed file starts with one of its
-  `paths.<lens>` prefixes, or when it has no `paths.` line. Skip it otherwise.
-- Round 2 and later: run every lens in `always` again, because fixes can
-  introduce new problems. Run a conditional lens again only when it said
-  `CHANGES` last round, or when the files changed since the last review
-  (`git diff --name-only <reviewed.(N-1)>..factory/<job-id>`) match its paths.
-  Otherwise mark it `skipped`. Its last verdict stands, and the approver reads
-  it from the earlier round folder.
-
-### Choosing models
-
-Each agent's file sets its model. There is one exception: when **every** changed
-file matches `light_paths`, spawn `reviewer-security` with `model: sonnet`
-instead of `opus`. Any code change, however small, keeps it on `opus`.
+     Then **Check the build**.
+   - `CHANGES`, no resumes left: go to **Approve** anyway. The approver sees the
+     open findings, recommends HOLD and explains them.
 
 ### Approve
 
-Set `stage: "approve"` and `head` to the output of `git rev-parse factory/<job-id>`.
-Spawn `approver` with `<paths> Final round: N.` When it returns, read the first
-line of `decision.md`:
+`F approve <job-id>`, then spawn `approver` with `<paths> Final round: N.` When
+it returns, run `F decision <job-id>`.
 
-- `RECOMMEND: MERGE`: set `stage: "ready"`.
-- `RECOMMEND: HOLD`: set `stage: "needs-human"`.
-- Anything else: stop and tell the user.
+Then **hand over to the human**: show `decision.md`'s **In short**, **What each
+department did** and **Your decision** sections, and the **Commands** block
+exactly as written. Say plainly that nothing has been merged, and that after
+running the commands they run `/factory done <job-id>`.
 
-Then **hand over to the human**: show them `decision.md`'s **In short**, **What
-each department did** and **Your decision** sections, and the **Commands**
-block exactly as written. Say plainly that nothing has been merged, and that
-after running the commands they run `/factory done <job-id>`. Don't run any of
-the commands yourself, even if asked to "just merge it" in passing: the
-commands are for the human to run.
+## /factory next, done and rework
 
-### Needs human (build blocked)
-
-When `build.md` says `STATUS: BLOCKED`, set `stage: "needs-human"`. Leave the
-branch and worktree in place. Tell the user the job id and worktree path, quote
-the `## Blocked` section, and suggest `/factory rework <job-id> <note>` once
-they've decided.
-
-## /factory next [n]
-
-Take the first `- [ ]` line in `factory/backlog.md`. Claim it with a single Edit
-that turns that exact line into `- [x] <item> → claimed`. If the Edit fails, the
-line changed under you (another session took it): re-read and try the next
-unchecked line. If there are none, say so and stop. Run `/factory <item>`, and
-once step 1 has the job id, replace `claimed` with it.
-
-**Batching** (`n` from 2 to 3) saves the per-agent startup cost on small fixes.
-Claim up to `n` unchecked items one at a time, as above, and run them as **one**
-job. The feature text is the items as a numbered list, and the slug describes
-the group. Batch only items that are each small and that touch related code.
-Never batch an item about auth, permissions, payments, secrets, migrations or
-deployment: run it alone, so its review is not diluted. If any item is like
-that, claim it as a job of its own and tell the user.
-
-## /factory done <job-id>
-
-The human says they have run the merge commands. Check it, but change nothing in
-git:
-
-1. Read the job's `job.json`. It must be in `ready` or `needs-human` and have a
-   `head`.
-2. `git merge-base --is-ancestor <head> <base>` must succeed (the job's commits
-   are in `<base>`). If it fails, say the merge isn't on `<base>` yet, point to the
-   **Commands** in `decision.md`, and stop.
-3. Set `stage: "merged"`. If `git worktree list` still shows the worktree, or
-   `git branch --list factory/<job-id>` still prints the branch, give the user
-   the cleanup commands from `decision.md` to run.
-4. Remind them that `<base>` is not pushed until they run `git push origin <base>`.
-
-## /factory rework <job-id> <note>
-
-Only for a job in `ready` or `needs-human`.
-
-1. Save the note verbatim as `rework-<k>.md` (next unused `k`).
-2. Set `stage: "build"`.
-3. Spawn a fresh `builder` named `builder-<job-id>` with
-   `<paths> Rework: read rework-<k>.md and address it, then update build.md for round N+1. Port: <port>.`
-   where `N` is the job's last round. The resume counter starts over.
-4. Carry on from **Check the build**.
+Read `references/commands.md` and follow it.
 
 ## Keeping the user posted
 
-Print one short line per transition, for example
-`004-contact-form: round 1 → security PASS, code CHANGES, ux/ui PASS → back to builder`.
-At the end, give the approver's recommendation and the merge commands (see
-**Approve**).
+Print one short line per transition, then the recommendation and commands at
+the end.
+
+## Example
+
+User: `/factory Add a contact form to the about page`
+
+```
+004-contact-form: worktree ready at /Users/me/Dev/my-app-factory/004-contact-form
+004-contact-form: spec written (5 acceptance criteria)
+004-contact-form: build round 1 READY
+004-contact-form: round 1, all 4 reviewers run (src/ changed)
+004-contact-form: round 1 → security PASS, code CHANGES, ux PASS, ui PASS → back to builder
+004-contact-form: build round 2 READY
+004-contact-form: round 2, ux/ui skipped (no src/ change since round 1)
+004-contact-form: round 2 → security PASS, code PASS → approver
+004-contact-form: RECOMMEND: MERGE. Nothing is merged yet.
+```
+
+Followed by the four `decision.md` sections and the Commands block.
+
+## Troubleshooting
+
+**`F new` fails with "branch factory/… already exists"**
+Cause: a branch is left over from an earlier attempt. The job number is used
+up, but no job folder was created.
+Fix: tell the user. They can delete the branch, or you rerun with another slug.
+
+**`F new` fails at `git worktree add`**
+Cause: the base branch from `config.md` doesn't exist, or the worktree folder
+is already there from a crashed run.
+Fix: tell the user, giving the path. The job folder exists in stage `spec`;
+`git worktree prune` and removing the stale folder are the user's call.
+
+**`F verdict` fails: "first line … must match"**
+Cause: the reviewer wrote no file, or a malformed first line.
+Fix: stop and tell the user which lens. Don't guess its verdict and don't
+rerun it silently.
+
+**The dev server can't bind its port**
+Cause: something else is using `5100 + 10n`, often a server left running by an
+earlier job.
+Fix: the agent reports it in its file. Tell the user which port is taken.
+
+**`F decision` or `F build` fails on the first line**
+Cause: the agent didn't follow its output format.
+Fix: stop and tell the user. Don't edit the agent's file yourself.
