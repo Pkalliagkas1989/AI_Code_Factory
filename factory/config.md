@@ -35,6 +35,8 @@ Product calls the human has already made, one per line, with the date. Agents
 treat them as settled: the spec-writer follows them and the approver doesn't
 hold a job for them again. Leave empty if there are none.
 
+- Todos stay in this browser only (localStorage); no accounts, sync or server (2026-10-25).
+
 ## Notes for agents
 
 Project facts every agent needs that `CLAUDE.md` doesn't say.
