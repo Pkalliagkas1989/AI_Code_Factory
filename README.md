@@ -80,9 +80,11 @@ templates/
 
 ## Security first, then tokens
 
-Every agent has a fixed start-up cost of roughly 40k tokens (its
-instructions, the project docs, the diff), so the factory saves tokens by
-running fewer and leaner agents, never by checking less:
+Every agent run has a fixed start-up cost (its instructions, the project
+docs, the diff). In the first test job, on a small app, a reviewer used 11k
+to 15k tokens, the builder 29k and the whole job 131k over 8 runs. The
+factory saves tokens by running fewer and leaner agents, never by checking
+less:
 
 - **Security and code review always run**, in every round. API, data, UX and UI
   reviews run only when the job changes files in their area
@@ -96,8 +98,9 @@ running fewer and leaner agents, never by checking less:
   always run alone.
 - **Context budget:** agents start from the diff, read only the lines they need,
   and only the builder and the code reviewer run the full test suite.
-- **Visible cost:** the orchestrator records each agent's tokens in `job.json`,
-  and the dashboard shows the total on each card.
+- **Visible cost:** the orchestrator records each agent run's tokens and time in
+  `job.json`. The dashboard shows the totals on each card, and a **cost** view
+  per run when you open a card.
 
 ## Commands
 

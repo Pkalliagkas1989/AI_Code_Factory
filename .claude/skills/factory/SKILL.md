@@ -37,10 +37,13 @@ the main checkout. Each command prints JSON or one word.
 | `F approve <job-id>` | Records the head commit and sets stage `approve`. |
 | `F decision <job-id>` | Prints `MERGE` or `HOLD` from `decision.md` and sets `ready` or `needs-human`. |
 | `F done <job-id>` | Checks the merge reached the base branch and sets `merged`. |
-| `F set <job-id> stage=<stage>` / `"tokens.<run>=<n>"` | Sets the stage, or records an agent run's tokens. |
+| `F set <job-id> stage=<stage>` / `"tokens.<run>=<n>"` / `"seconds.<run>=<n>"` | Sets the stage, or records an agent run's tokens and duration. |
 
-Record each agent's tokens with `F set` when its result reports them
-(`spec-writer`, `builder r1`, `security r1`, …). Never guess a number.
+Record each agent run's tokens and duration (whole seconds) with `F set` when
+its result reports them, in one call:
+`F set <job-id> "tokens.builder r1=29492" "seconds.builder r1=134"`. Name runs
+`spec-writer`, `builder r1`, `security r1`, … and add `retry` to a reminded
+reviewer's run (`code r1 retry`). Never guess a number.
 
 Paths, `job.json` fields, ports and the reviewer-selection rules are in
 `references/job-state.md`. Read it only when a result needs explaining.
