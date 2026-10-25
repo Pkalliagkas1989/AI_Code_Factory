@@ -36,7 +36,7 @@ Setup takes 6 steps and is done once per project. A developer usually does it; a
 
 - **Claude Code** installed and signed in.
 - **git**, with the project already in a git repository.
-- **Python 3**, only if you want the live dashboard (section 7).
+- **Python 3**. The factory's helper script needs it, and so does the live dashboard (section 7). On a Mac it is usually already installed; check with `python3 --version`.
 - **agent-browser** ([link](https://github.com/vercel-labs/agent-browser)), only for projects with web pages, so the agents can look at the running app.
 
 ### The 6 steps
@@ -130,7 +130,7 @@ Everything a job produces is a readable text file in `factory/jobs/<job-id>/`. Y
 
 | File | Written by | What it holds |
 | --- | --- | --- |
-| `job.json` | The orchestrator (the Claude session you typed in) | Current stage, round, verdicts and token use. The dashboard reads it. |
+| `job.json` | The orchestrator (the Claude session you typed in), through its helper script | Current stage, round, verdicts and token use. The dashboard reads it. |
 | `spec.md` | Spec writer | Requirements, acceptance criteria and assumptions. |
 | `build.md` | Builder | What was built, how each criterion was tested, `STATUS: READY` or `BLOCKED`. |
 | `round-<N>/review-<name>.md` | Each reviewer | Verdict and findings for round N. |
