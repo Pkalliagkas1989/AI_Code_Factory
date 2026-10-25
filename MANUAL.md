@@ -85,6 +85,8 @@ You control the factory with these commands, typed into Claude Code inside your 
 
 To build a feature on top of an earlier job before you merge it, say so in the request, for example `/factory On top of job 009: add a side view of the mission`. The new job starts from job 009's branch, and its merge commands merge into that branch. You never need to change `base_branch` for this.
 
+To merge a whole chain, you can merge only the last job's branch into `main`: it already contains every job before it. Then run `/factory done` for each job. Don't delete a job's branch while a later job still builds on it; the approver leaves that cleanup step out for you.
+
 ### Writing a good feature request
 
 The spec writer works only from your sentence and the project files, so be concrete. Say **what** should happen, **where**, and **for whom**. Leave out how to code it.

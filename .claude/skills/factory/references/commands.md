@@ -37,6 +37,13 @@ For backlog items that build on each other, when nothing is merged in between
 4. At the end, list each job with its recommendation and tokens, and say which
    branch holds the whole chain (the last job's).
 
+**Merging a chain.** Either merge the last job's branch into the base branch
+once, which brings in every job before it, or merge each job into the one it
+builds on from the top down. Then run `/factory done` for every job: a chained
+job counts as merged when its work reached its own base or the config's
+`base_branch`. Never delete a job's branch while a later job still builds on
+it; the approver leaves that cleanup out for you.
+
 Never change `base_branch` in the config to chain jobs.
 
 ## /factory resume JOB-ID
@@ -46,10 +53,11 @@ what `next` says, then carry on from that point in `SKILL.md`:
 
 | `next` | Do |
 | --- | --- |
-| `spec-writer` | Spawn the spec-writer (step 4 of **/factory FEATURE**). |
-| `builder` | `SendMessage` to `builder-<job-id>` if it still exists, else spawn a fresh builder named `builder-<job-id>` with `<prompt_prefix> Build round <round + 1, or 1>. Port: <builder_port>. You were interrupted: read build.md and git log first and continue; don't redo finished work.` |
+| `spec-writer` | Check the worktree exists and run its setup again (step 3 of **/factory FEATURE**), then spawn the spec-writer. |
+| `builder` | If the stage is still `spec`, run `F set <job-id> stage=build` first. Then `SendMessage` to `builder-<job-id>` if it still exists, else spawn a fresh builder named `builder-<job-id>` with `<prompt_prefix> Build round <round + 1, or 1>. Port: <builder_port>. You were interrupted: read build.md and git log first and continue; don't redo finished work.` |
+| `build` | **Check the build**: the builder finished but `F build` never ran. |
 | `start-round N` | **Review round N**. |
-| `reviewers` | Spawn only the lenses in `pending_lenses`, as in **Review round N** step 2. |
+| `reviewers` | Run `F verdict` for each lens in `verdict_lenses` (its file is already written). Spawn only the lenses in `pending_lenses`, as in **Review round N** step 2. |
 | `approve` | **Approve**. |
 | `approver` | Spawn the approver with `<paths> Final round: <round>.` |
 | `decision` | Run `F decision <job-id>` and hand over. |

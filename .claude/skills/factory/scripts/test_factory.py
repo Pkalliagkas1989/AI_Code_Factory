@@ -171,6 +171,8 @@ class ResumeTest(FactoryTest):
         self.repo.commit_in("001-first")
         self.repo.write("001-first", "build.md", "STATUS: READY\n")
         self.repo.f("set", "001-first", "tokens.builder r1+=1")
+        self.assertEqual(self.repo.f("resume", "001-first")["next"], "build")
+        self.repo.f("build", "001-first")
         self.assertEqual(self.repo.f("resume", "001-first")["next"], "start-round 1")
         self.repo.f("start-round", "001-first", "1")
         (self.repo.root / "factory" / "jobs" / "001-first" / "round-1" / "review-code.md").write_text("VERDICT: PASS\n")
@@ -201,6 +203,141 @@ class ResumeTest(FactoryTest):
         self.repo.commit_in("001-first")
         self.repo.write("001-first", "build.md", "STATUS: BLOCKED\n\n## Blocked\nThe spec contradicts itself.\n")
         self.assertEqual(self.repo.f("build", "001-first"), "BLOCKED")
+
+
+class ReviewFixesTest(FactoryTest):
+    """Cases from the code review of the first version."""
+
+    def ready(self, job_id="001-first"):
+        self.repo.write(job_id, "build.md", "STATUS: READY\n")
+        return self.repo.f("build", job_id)
+
+    def review(self, n, verdicts, job_id="001-first"):
+        self.repo.f("start-round", job_id, str(n))
+        for lens, v in verdicts.items():
+            (self.repo.root / "factory" / "jobs" / job_id / f"round-{n}" / f"review-{lens}.md").write_text(f"VERDICT: {v}\n")
+            self.repo.f("verdict", job_id, str(n), lens)
+
+    def test_resume_after_a_retry_sends_the_builder_back(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.write("001-first", "build.md", "STATUS: BLOCKED\n")
+        self.assertEqual(self.repo.f("build", "001-first"), "RETRY")
+        self.assertEqual(self.repo.f("resume", "001-first")["next"], "builder")
+
+    def test_resume_does_not_trust_a_build_md_from_the_last_round(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.commit_in("001-first", "a.txt")
+        self.ready()
+        self.review(1, {"security": "PASS", "code": "CHANGES"})
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.commit_in("001-first", "half-a-fix.txt")  # then the session dies
+        self.assertEqual(self.repo.f("resume", "001-first")["next"], "builder")
+        self.ready()
+        self.assertEqual(self.repo.f("resume", "001-first")["next"], "start-round 2")
+
+    def test_resume_stops_at_the_round_limit(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("set", "001-first", "stage=build")
+        for n in (1, 2, 3):
+            self.repo.commit_in("001-first", f"r{n}.txt")
+            self.ready()
+            self.review(n, {"security": "PASS", "code": "CHANGES"})
+            if n < 3:
+                self.assertEqual(self.repo.f("resume", "001-first")["next"], "builder")
+                self.repo.f("set", "001-first", "stage=build")
+        self.assertEqual(self.repo.f("resume", "001-first")["next"], "approve")
+
+    def test_resume_after_rework_runs_the_approver_again(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.commit_in("001-first")
+        self.ready()
+        self.review(1, {"security": "PASS", "code": "PASS"})
+        self.repo.f("approve", "001-first")
+        self.repo.write("001-first", "decision.md", "RECOMMEND: MERGE\n")
+        self.repo.f("decision", "001-first")
+        self.repo.f("set", "001-first", "stage=build")  # /factory rework
+        self.repo.commit_in("001-first", "rework.txt")
+        self.ready()
+        self.review(2, {"security": "PASS", "code": "PASS"})
+        self.repo.f("approve", "001-first")  # old decision.md is still there
+        self.assertEqual(self.repo.f("resume", "001-first")["next"], "approver")
+
+    def test_a_review_file_without_a_recorded_verdict_is_not_spawned_again(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.commit_in("001-first")
+        self.ready()
+        self.repo.f("start-round", "001-first", "1")
+        (self.repo.root / "factory" / "jobs" / "001-first" / "round-1" / "review-code.md").write_text("VERDICT: PASS\n")
+        r = self.repo.f("resume", "001-first")
+        self.assertEqual((r["pending_lenses"], r["verdict_lenses"]), (["security"], ["code"]))
+
+    def test_rework_gets_its_own_retry(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.write("001-first", "build.md", "STATUS: BLOCKED\n")
+        self.assertEqual(self.repo.f("build", "001-first"), "RETRY")
+        self.repo.commit_in("001-first")
+        self.ready()
+        self.review(1, {"security": "PASS", "code": "PASS"})
+        self.repo.f("approve", "001-first")
+        self.repo.write("001-first", "decision.md", "RECOMMEND: MERGE\n")
+        self.repo.f("decision", "001-first")
+        self.repo.f("set", "001-first", "stage=build")  # /factory rework
+        self.repo.write("001-first", "build.md", "STATUS: BLOCKED\n")
+        self.assertEqual(self.repo.f("build", "001-first"), "RETRY")
+
+    def test_new_rejects_three_arguments(self):
+        r = self.repo.f("new", "first", "First", "--after", ok=False)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_interrupt_strips_the_run_name(self):
+        self.repo.f("new", "first", "First")
+        self.repo.f("interrupt", "001-first", "builder r1 ")
+        self.repo.f("set", "001-first", "tokens.builder r1+=1")
+        self.assertEqual(self.repo.job("001-first").get("interrupted", {}), {})
+
+
+class ChainMergeTest(FactoryTest):
+    def chain(self):
+        self.repo.f("new", "first", "First")
+        self.repo.commit_in("001-first", "first.txt")
+        self.repo.f("new", "second", "Second", "--after", "001")
+        self.repo.commit_in("002-second", "second.txt")
+        self.repo.write("002-second", "build.md", "STATUS: READY\n")
+        self.repo.f("build", "002-second")
+
+    def finish(self, job_id):
+        self.repo.f("start-round", job_id, "1")
+        for lens in ("security", "code"):
+            (self.repo.root / "factory" / "jobs" / job_id / "round-1" / f"review-{lens}.md").write_text("VERDICT: PASS\n")
+            self.repo.f("verdict", job_id, "1", lens)
+        self.repo.f("approve", job_id)
+        self.repo.write(job_id, "decision.md", "RECOMMEND: MERGE\n")
+        self.repo.f("decision", job_id)
+
+    def test_a_chained_job_still_works_after_its_base_branch_is_deleted(self):
+        self.chain()
+        wt = self.repo.job("001-first")["worktree"]
+        self.repo.git("merge", "-q", "--no-ff", "factory/001-first", "-m", "merge 001")
+        self.repo.git("worktree", "remove", wt)
+        self.repo.git("branch", "-d", "factory/001-first")
+        out = self.repo.f("start-round", "002-second", "1")
+        self.assertEqual(out["round"], 1)
+
+    def test_merging_the_last_job_of_a_chain_into_main_marks_every_job_done(self):
+        self.chain()
+        self.finish("002-second")
+        self.repo.f("set", "001-first", "stage=build")
+        self.repo.write("001-first", "build.md", "STATUS: READY\n")
+        self.repo.f("build", "001-first")
+        self.finish("001-first")
+        self.repo.git("merge", "-q", "--no-ff", "factory/002-second", "-m", "merge the chain")
+        self.assertTrue(self.repo.f("done", "002-second")["merged"])
+        self.assertTrue(self.repo.f("done", "001-first")["merged"])
 
 
 if __name__ == "__main__":

@@ -173,5 +173,8 @@ instead.
   the job id, and a merge message written for this job. Each `-m` becomes one
   paragraph of the message. Inside the quotes, don't use `"`, `$` or backticks,
   because the shell would interpret them.
+- If another job builds on this one (a `job.json` in `factory/jobs/` whose
+  `after` is this job's id), leave out `git branch -d` and the worktree removal
+  for this job, and say which job still needs the branch.
 - Write the commands even when you recommend HOLD, so the human can still merge
   if they decide to.

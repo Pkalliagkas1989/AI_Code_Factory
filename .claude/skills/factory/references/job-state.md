@@ -41,6 +41,8 @@ decision.md                   approver
   `base_branch`, or with `F new --after <job>` that job's branch. Older
   job.json files without it use the config's `base_branch`.
 - `after`: the job this one builds on, or `null`. The dashboard shows it.
+- `base_sha`: the commit the job started from. Reviews diff against it if
+  the base branch was deleted after its own merge.
 - `stage`: `spec`, `build`, `review`, `approve`, `ready`, `needs-human` or
   `merged`. Worktree setup counts as `spec`. `ready` means the approver
   recommends merging and the human has not merged yet.
@@ -58,8 +60,13 @@ decision.md                   approver
   a run, so a run resumed after an interruption counts both parts.
 - `interrupted`: runs that stopped early, with the time (`F interrupt`).
   Recording a run's cost removes it.
+- `built`: the round the last READY build is for, set by `F build`.
+- `reviewed_at`, `approved_at`: when the last round started and when the
+  approver was last started. `F resume` uses `built` and these times, never a
+  `build.md` or `decision.md` left over from an earlier round.
 - `retried`: the round in which a BLOCKED build with nothing committed was sent
-  back once automatically (`F build` printed `RETRY`).
+  back once automatically (`F build` printed `RETRY`). Cleared by a rework, so
+  the rework gets its own retry.
 
 The file is rewritten whole on every change, through a temporary file and a
 rename, so the dashboard never reads half of it.

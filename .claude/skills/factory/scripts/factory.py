@@ -27,10 +27,12 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 STAGES = ("spec", "build", "review", "approve", "ready", "needs-human", "merged")
+MAX_ROUNDS = 3  # round 1 plus at most 2 resumes (SKILL.md: MAX_RESUMES = 2)
 BROWSER_LENSES = ("ux", "ui")  # reviews that must open the running app
 
 
@@ -95,8 +97,8 @@ def find_job(ref):
     jobs = repo() / "factory" / "jobs"
     if re.fullmatch(r"\d{3}", ref):
         hits = [p.name for p in jobs.glob(f"{ref}-*") if (p / "job.json").is_file()] if jobs.is_dir() else []
-        if not hits:
-            fail(f"no job {ref}")
+        if len(hits) != 1:
+            fail(f"no job {ref}" if not hits else f"more than one job {ref}: {', '.join(sorted(hits))}")
         return hits[0]
     job_dir(ref)
     return ref
@@ -105,6 +107,15 @@ def find_job(ref):
 def base_of(job, cfg):
     # Jobs record their own base; older job.json files predate that
     return job.get("base") or cfg["base"]
+
+
+def base_ref(job, cfg):
+    """What to diff a job against. A chained job's base branch may be gone once the
+    job before it was merged and cleaned up: fall back to the commit it started from."""
+    base = base_of(job, cfg)
+    if git("rev-parse", "--verify", "--quiet", base, check=False).returncode == 0:
+        return base
+    return job.get("base_sha") or cfg["base"]
 
 
 def load(job_id):
@@ -173,6 +184,7 @@ def cmd_new(slug, feature, *rest):
         except FileExistsError:
             continue  # another session took this number; try the next
     job_id = f"{n:03d}-{slug}"
+    base_sha = git("rev-parse", base).stdout.strip()
     if git("rev-parse", "--verify", "--quiet", f"factory/{job_id}", check=False).returncode == 0:
         fail(f"branch factory/{job_id} already exists; delete it or pick another slug")
     (jobs / job_id).mkdir()
@@ -182,6 +194,7 @@ def cmd_new(slug, feature, *rest):
         "branch": f"factory/{job_id}",
         "worktree": str(root.parent / f"{root.name}-factory" / job_id),
         "base": base,
+        "base_sha": base_sha,
         "after": after,
         "stage": "spec",
         "round": 0,
@@ -199,7 +212,7 @@ def light_match(path, patterns):
 def cmd_start_round(job_id, n):
     n = int(n)
     job, cfg = load(job_id), config()
-    branch, base = job["branch"], base_of(job, cfg)
+    branch, base = job["branch"], base_ref(job, cfg)
     whole = git("diff", "--name-only", f"{base}...{branch}").stdout.split()
     if n == 1:
         changed = whole
@@ -229,7 +242,7 @@ def cmd_start_round(job_id, n):
     # Security drops to sonnet only when every changed file in the job is low-risk
     light = bool(whole) and all(light_match(f, cfg["light"]) for f in whole)
     (job_dir(job_id) / f"round-{n}").mkdir(exist_ok=True)
-    job.update(stage="review", round=n)
+    job.update(stage="review", round=n, reviewed_at=time.time())
     job.setdefault("reviewed", {})[str(n)] = git("rev-parse", "--short", branch).stdout.strip()
     job["reviews"] = {lens: "pending" for lens in cfg["reviewers"]}
     for s in skipped:
@@ -263,7 +276,7 @@ def cmd_verdict(job_id, n, lens):
 
 
 def new_commits(job, cfg):
-    since = job.get("reviewed", {}).get(str(job["round"])) or base_of(job, cfg)
+    since = job.get("reviewed", {}).get(str(job["round"])) or base_ref(job, cfg)
     return int(git("rev-list", "--count", f"{since}..{job['branch']}").stdout.strip())
 
 
@@ -279,13 +292,19 @@ def cmd_build(job_id):
             out("RETRY")
             return
         job["stage"] = "needs-human"
-        save(job)
+    else:
+        # Ready for the next round; resume trusts this, not a build.md left over
+        job["built"] = job["round"] + 1
+        for run in [r for r in job.get("interrupted", {}) if r.startswith("builder")]:
+            del job["interrupted"][run]
+    save(job)
     out(status)
 
 
 def cmd_approve(job_id):
     job = load(job_id)
     job.update(stage="approve", head=git("rev-parse", job["branch"]).stdout.strip())
+    job["approved_at"] = time.time()  # a decision.md older than this is stale
     save(job)
     out(job["head"])
 
@@ -294,6 +313,7 @@ def cmd_decision(job_id):
     job = load(job_id)
     rec = first_line(job_dir(job_id) / "decision.md", r"RECOMMEND: (MERGE|HOLD)", "approver")
     job["stage"] = "ready" if rec == "MERGE" else "needs-human"
+
     save(job)
     out(rec)
 
@@ -302,9 +322,12 @@ def cmd_done(job_id):
     job, cfg = load(job_id), config()
     if job["stage"] not in ("ready", "needs-human") or not job.get("head"):
         fail(f"{job_id} is in stage {job['stage']}; only a job waiting for you can be marked done")
-    base = base_of(job, cfg)
-    if git("merge-base", "--is-ancestor", job["head"], base, check=False).returncode:
-        fail(f"{job_id} is not merged into {base} yet; run the Commands in decision.md first")
+    # A chained job counts as merged once it reached its own base or the config's
+    # base_branch (merging a chain's last branch into main merges every job in it)
+    bases = [b for b in dict.fromkeys([base_of(job, cfg), cfg["base"]])
+             if git("rev-parse", "--verify", "--quiet", b, check=False).returncode == 0]
+    if not any(git("merge-base", "--is-ancestor", job["head"], b, check=False).returncode == 0 for b in bases):
+        fail(f"{job_id} is not merged into {' or '.join(bases)} yet; run the Commands in decision.md first")
     job["stage"] = "merged"
     save(job)
     out({
@@ -323,6 +346,8 @@ def cmd_set(job_id, *pairs):
         if key == "stage":
             if value not in STAGES:
                 fail(f"stage must be one of {', '.join(STAGES)}")
+            if value == "build" and job["stage"] in ("ready", "needs-human"):
+                job.pop("retried", None)  # a rework gets its own automatic retry
             job["stage"] = value
         elif key.split(".")[0] in ("tokens", "seconds") and "." in key and value.isdigit():
             field, run = key.split(".", 1)
@@ -340,33 +365,51 @@ def cmd_set(job_id, *pairs):
 
 def cmd_interrupt(job_id, run):
     job = load(job_id)
-    job.setdefault("interrupted", {})[run] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    job.setdefault("interrupted", {})[run.strip()] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     save(job)
     out("ok")
 
 
 def cmd_resume(job_id):
-    job, cfg = load(job_id), config()
+    """The next step from the state recorded in job.json, never from files that an
+    earlier round may have left behind."""
+    job = load(job_id)
     d = job_dir(job_id)
     stage, n = job["stage"], job["round"]
-    pending = [lens for lens, v in job["reviews"].items() if v == "pending"] if stage == "review" else []
+    pending, verdict = [], []
+    if stage == "review":
+        for lens, v in job["reviews"].items():
+            if v == "pending":
+                # A review written before the session died only needs F verdict
+                (verdict if (d / f"round-{n}" / f"review-{lens}.md").is_file() else pending).append(lens)
     if stage == "spec":
         step = "builder" if (d / "spec.md").is_file() else "spec-writer"
     elif stage == "build":
-        # Builder still owes work when build.md is missing, the run was cut short,
-        # or nothing was committed since the last reviewed round
-        owed = (not (d / "build.md").is_file() or any(r.startswith("builder") for r in job.get("interrupted", {}))
-                or (n > 0 and new_commits(job, cfg) == 0))
-        step = "builder" if owed else f"start-round {n + 1}"
+        report = d / "build.md"
+        # A build.md written since the last review round, not yet read by F build
+        fresh = report.is_file() and report.stat().st_mtime >= job.get("reviewed_at", 0)
+        status = report.read_text().split("\n", 1)[0].strip() if fresh else ""
+        if job.get("built") == n + 1:
+            step = f"start-round {n + 1}"
+        elif status == "STATUS: READY" or (status == "STATUS: BLOCKED" and job.get("retried") != n):
+            step = "build"
+        else:
+            step = "builder"
     elif stage == "review":
         values = job["reviews"].values()
-        step = "reviewers" if pending else ("builder" if "CHANGES" in values else "approve")
+        if pending or verdict:
+            step = "reviewers"
+        else:
+            step = "builder" if "CHANGES" in values and n < MAX_ROUNDS else "approve"
     elif stage == "approve":
-        step = "decision" if (d / "decision.md").is_file() else "approver"
+        # Only a decision.md written after the latest F approve belongs to this head
+        decision = d / "decision.md"
+        fresh = decision.is_file() and decision.stat().st_mtime >= job.get("approved_at", 0)
+        step = "decision" if fresh else "approver"
     else:
         step = "none" if stage == "merged" else "human"
     out({"id": job_id, "stage": stage, "round": n, "next": step, "pending_lenses": pending,
-         "interrupted": sorted(job.get("interrupted", {}))})
+         "verdict_lenses": verdict, "interrupted": sorted(job.get("interrupted", {}))})
 
 
 COMMANDS = {
