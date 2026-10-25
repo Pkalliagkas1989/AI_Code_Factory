@@ -14,7 +14,12 @@ let filter = 'all'
 // A click on a label waits this long before toggling, so a double-click
 // can cancel it and open the editor instead.
 const TOGGLE_DELAY = 250
-let toggleTimer
+const toggleTimers = new Map()
+
+function cancelToggle(id) {
+  clearTimeout(toggleTimers.get(id))
+  toggleTimers.delete(id)
+}
 
 function load() {
   try { return JSON.parse(localStorage.getItem(KEY)) ?? [] } catch { return [] }
@@ -43,11 +48,15 @@ function render() {
     label.addEventListener('click', (e) => {
       if (e.detail === 0) return
       e.preventDefault()
-      clearTimeout(toggleTimer)
-      if (e.detail === 1) toggleTimer = setTimeout(() => update(toggleTodo(todos, t.id)), TOGGLE_DELAY)
+      cancelToggle(t.id)
+      if (e.detail !== 1) return
+      toggleTimers.set(t.id, setTimeout(() => {
+        toggleTimers.delete(t.id)
+        update(toggleTodo(todos, t.id))
+      }, TOGGLE_DELAY))
     })
     label.addEventListener('dblclick', () => {
-      clearTimeout(toggleTimer)
+      cancelToggle(t.id)
       startEdit(label, t)
     })
 
