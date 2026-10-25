@@ -3,7 +3,7 @@
 Settings for this project. The orchestrator and every agent read this file,
 so keep it short.
 
-base_branch: main
+base_branch: factory-test-app
 reviewers: security, ux, ui, code
 always: security, code
 paths.ux: src/
