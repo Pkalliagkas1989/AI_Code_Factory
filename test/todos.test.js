@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addTodo, toggleTodo, removeTodo, remaining, filterTodos, clearCompleted } from '../src/todos.js'
+import { addTodo, toggleTodo, removeTodo, remaining, filterTodos, clearCompleted, editTodo } from '../src/todos.js'
 
 test('addTodo trims text and gives the next id', () => {
   const todos = addTodo(addTodo([], ' Buy milk '), 'Walk dog')
@@ -67,4 +67,40 @@ test('clearCompleted does not mutate its input', () => {
   const after = clearCompleted(before)
   assert.deepEqual(before, copy)
   assert.notEqual(after, before)
+})
+
+test('editTodo updates and trims the text of one todo', () => {
+  const after = editTodo(sample(), 2, '  b2  ')
+  assert.deepEqual(after, [
+    { id: 1, text: 'a', done: false },
+    { id: 2, text: 'b2', done: true },
+    { id: 3, text: 'c', done: false },
+  ])
+})
+
+test('editTodo removes the todo when the text is empty or only spaces', () => {
+  assert.deepEqual(editTodo(sample(), 2, '').map((t) => t.id), [1, 3])
+  assert.deepEqual(editTodo(sample(), 2, '   ').map((t) => t.id), [1, 3])
+})
+
+test('editTodo leaves other todos untouched', () => {
+  const before = sample()
+  const after = editTodo(before, 2, 'x')
+  assert.equal(after[0], before[0])
+  assert.equal(after[2], before[2])
+})
+
+test('editTodo with an unknown id returns an equal copy', () => {
+  const before = sample()
+  const after = editTodo(before, 99, 'x')
+  assert.deepEqual(after, before)
+  assert.notEqual(after, before)
+})
+
+test('editTodo does not mutate its input', () => {
+  const before = sample()
+  const copy = structuredClone(before)
+  editTodo(before, 2, 'changed')
+  editTodo(before, 1, '')
+  assert.deepEqual(before, copy)
 })
