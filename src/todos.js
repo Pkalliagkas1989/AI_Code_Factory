@@ -29,3 +29,9 @@ export function filterTodos(todos, filter) {
 export function clearCompleted(todos) {
   return todos.filter((t) => !t.done)
 }
+
+export function editTodo(todos, id, text) {
+  const trimmed = text.trim()
+  if (!trimmed) return removeTodo(todos, id)
+  return todos.map((t) => (t.id === id ? { ...t, text: trimmed } : t))
+}
