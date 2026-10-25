@@ -56,6 +56,12 @@
                   padding: 5px 8px; border-radius: 6px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer; }
   .files button.on { background: var(--pending-bg); }
   .doc { padding: 14px 20px; overflow: auto; max-height: 86vh; }
+  .cost { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cost th, .cost td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .cost th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  .cost .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cost .bar { height: 8px; border-radius: 4px; background: var(--accent); min-width: 2px; }
+  .cost tfoot td { font-weight: 600; border-bottom: 0; }
   .doc pre { background: var(--bg); padding: 10px; border-radius: 8px; overflow-x: auto; }
   .doc code { font: 12px ui-monospace, Menlo, monospace; }
   .close { float: right; border: 0; background: none; color: var(--muted); font-size: 20px; cursor: pointer; }
@@ -111,12 +117,36 @@ async function loadRounds(job) {
   return rounds
 }
 
-// Total tokens the job's agents reported; shown so cost stays visible
+const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0)
+const duration = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
+
+// Total tokens and agent time the job's agents reported; shown so cost stays visible
 function tokens(job) {
-  const runs = Object.values(job.tokens || {})
-  if (!runs.length) return ''
-  const total = runs.reduce((a, b) => a + b, 0)
-  return `<div class="tokens">${(total / 1000).toFixed(0)}k tokens · ${runs.length} agent runs</div>`
+  const runs = Object.keys(job.tokens || {}).length
+  if (!runs) return ''
+  const time = sum(job.seconds) ? ` · ${duration(sum(job.seconds))}` : ''
+  return `<div class="tokens">${(sum(job.tokens) / 1000).toFixed(0)}k tokens · ${runs} agent runs${time}</div>`
+}
+
+// One row per agent run, largest first, with its share of the job's tokens
+function costTable(job) {
+  const total = sum(job.tokens)
+  if (!total) return '<p>No agent has reported its tokens yet.</p>'
+  const max = Math.max(...Object.values(job.tokens))  // bars compare runs, so the largest fills the column
+  const rows = Object.entries(job.tokens).sort((a, b) => b[1] - a[1]).map(([run, t]) => {
+    const s = job.seconds?.[run]
+    return `<tr><td>${esc(run)}</td><td class="num">${(t / 1000).toFixed(1)}k</td>
+      <td class="num">${Math.round((t / total) * 100)}%</td>
+      <td style="width:40%"><div class="bar" style="width:${(t / max) * 100}%"></div></td>
+      <td class="num">${s == null ? '–' : duration(s)}</td></tr>`
+  }).join('')
+  const time = sum(job.seconds)
+  return `<h2>Cost per agent run</h2><table class="cost">
+    <thead><tr><th>Run</th><th class="num">Tokens</th><th class="num">Share</th><th></th><th class="num">Time</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td>Total</td><td class="num">${(total / 1000).toFixed(1)}k</td><td></td><td></td>
+      <td class="num">${time ? duration(time) : '–'}</td></tr></tfoot></table>
+    <p style="color:var(--muted);font-size:12px">Time is added up per run. Reviewers run in parallel, so the job finishes sooner than the total.</p>`
 }
 
 function card(job) {
@@ -173,10 +203,14 @@ async function openJob(id) {
   files.sort((a, b) => order(a) - order(b) || a.localeCompare(b, undefined, { numeric: true }))
   const nav = document.getElementById('files')
   nav.innerHTML = `<button class="close" aria-label="Close">×</button><div class="id" style="margin:4px 8px 10px">${esc(id)}</div>` +
-    files.map((f) => `<button data-f="${esc(f)}">${esc(f)}</button>`).join('')
+    ['cost', ...files].map((f) => `<button data-f="${esc(f)}">${esc(f)}</button>`).join('')
   nav.querySelector('.close').onclick = () => document.getElementById('dlg').close()
   const show = async (f) => {
     nav.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('on', b.dataset.f === f))
+    if (f === 'cost') {
+      document.getElementById('doc').innerHTML = costTable(JSON.parse(await get(base + 'job.json')))
+      return
+    }
     const text = await get(base + f)
     document.getElementById('doc').innerHTML = f.endsWith('.json') ? `<pre><code>${esc(text)}</code></pre>` : md(text)
   }

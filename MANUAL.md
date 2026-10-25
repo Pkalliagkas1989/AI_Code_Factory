@@ -173,7 +173,7 @@ The security review drops to Sonnet only when a job changes nothing but low-risk
 
 ### Why some reviewers are skipped
 
-Every agent costs roughly 40,000 tokens just to start, so the factory skips reviewers that have nothing to check. Security and code review are **never** skipped. A UX or UI review is skipped only if no files in its area changed. When in doubt, it runs. A skipped reviewer's last verdict still counts.
+Every agent run has a start-up cost (about 11,000 to 15,000 tokens for a reviewer on a small project), so the factory skips reviewers that have nothing to check. Security and code review are **never** skipped. A UX or UI review is skipped only if no files in its area changed. When in doubt, it runs. A skipped reviewer's last verdict still counts.
 
 ## 6. Reading the report and merging
 
@@ -236,10 +236,10 @@ What you see on each card:
 
 - The job id and the feature request.
 - A coloured chip per reviewer: green for PASS, red for CHANGES.
-- Total tokens used and the number of agent runs, so cost stays visible.
+- Total tokens used, the number of agent runs and the total agent time, so cost stays visible.
 - Highlighted cards marked **ready to merge** or **needs you** are waiting for you.
 
-Click a card to read its files (spec, build report, reviews, decision).
+Click a card to read its files (spec, build report, reviews, decision). The first entry, **cost**, lists every agent run with its tokens, its share of the job and how long it took.
 
 ## 8. Troubleshooting and common questions
 
@@ -259,6 +259,6 @@ Click a card to read its files (spec, build report, reviews, decision).
 
 **Do my colleagues see the change after I merge?** Only after `git push origin main`. Merging alone changes only your computer.
 
-**How much does a job cost?** Each agent run is roughly 40,000 tokens or more. A job that passes in one round uses 5 to 7 agent runs (spec writer, builder, 2 to 4 reviewers, approver); each fix round adds more. The dashboard shows the exact total per job.
+**How much does a job cost?** A job that passes in one round uses 5 to 7 agent runs (spec writer, builder, 2 to 4 reviewers, approver); each fix round adds more. The first test job, a small feature on a small app, used 131,000 tokens over 8 runs: about 11,000 to 15,000 per reviewer, 29,000 for the builder and 20,000 for the approver. Bigger projects cost more. Open a job's card on the dashboard and choose **cost** to see every run's tokens and time.
 
 **Where do I learn more?** Read `README.md` in the repository, and the agent instructions in `.claude/agents/`.

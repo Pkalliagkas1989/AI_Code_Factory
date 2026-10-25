@@ -49,6 +49,8 @@ decision.md                   approver
   `/factory done` checks it is on the base branch.
 - `tokens`: tokens per agent run, only when the agent's result reports them.
   Never guessed.
+- `seconds`: how long each agent run took, same run names as `tokens`. The
+  dashboard shows both per run when a card is opened (**cost**).
 
 The file is rewritten whole on every change, through a temporary file and a
 rename, so the dashboard never reads half of it.

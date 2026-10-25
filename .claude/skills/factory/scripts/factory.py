@@ -12,7 +12,8 @@ stdout. Exit code 1 means stop and tell the user: stderr says why.
   approve <job-id>          record the reviewed head and enter the approve stage
   decision <job-id>         read decision.md's recommendation (MERGE or HOLD)
   done <job-id>             check the merge reached the base branch
-  set <job-id> key=value…   set stage or record tokens ("tokens.builder r1=48128")
+  set <job-id> key=value…   set stage, or record a run's cost:
+                            "tokens.builder r1=48128" "seconds.builder r1=134"
 """
 import fnmatch
 import json
@@ -261,10 +262,11 @@ def cmd_set(job_id, *pairs):
             if value not in STAGES:
                 fail(f"stage must be one of {', '.join(STAGES)}")
             job["stage"] = value
-        elif key.startswith("tokens.") and value.isdigit():
-            job.setdefault("tokens", {})[key[len("tokens."):]] = int(value)
+        elif key.split(".")[0] in ("tokens", "seconds") and "." in key and value.isdigit():
+            field, run = key.split(".", 1)
+            job.setdefault(field, {})[run] = int(value)
         else:
-            fail(f"set only takes stage=… or tokens.<run>=<number>, got {key!r}")
+            fail(f"set only takes stage=…, tokens.<run>=<number> or seconds.<run>=<number>, got {key!r}")
     save(job)
     out("ok")
 
