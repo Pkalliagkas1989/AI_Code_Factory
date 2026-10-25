@@ -90,3 +90,5 @@ approver can hold it.
   for new tests if the project has a test runner.
 - Flag business or product decisions (pricing, public copy, what's free or paid)
   as Assumptions, so the approver can escalate them.
+- The config's **Decided by the human** section is settled: follow it, cite it
+  under Context, and don't list it again as an Assumption.

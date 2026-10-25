@@ -44,6 +44,8 @@
   .chip.PASS { background: var(--pass-bg); color: var(--pass); }
   .chip.CHANGES { background: var(--changes-bg); color: var(--changes); }
   .chip.skipped { background: none; border: 1px dashed var(--line); text-decoration: line-through; }
+  .chip.interrupted { background: var(--changes-bg); color: var(--changes); }
+  .card .after { font-size: 11px; color: var(--muted); margin-left: 6px; }
   .tokens { margin-top: 8px; font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
   .empty { color: var(--muted); font-size: 12px; margin: 4px; }
   dialog { width: min(860px, calc(100vw - 32px)); max-height: 86vh; border: 1px solid var(--line);
@@ -120,6 +122,12 @@ async function loadRounds(job) {
 const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0)
 const duration = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
 
+// Runs cut short by a usage limit or a crash, until their cost is recorded
+function interrupted(job) {
+  const runs = Object.keys(job.interrupted || {})
+  return runs.length ? `<div class="round">${runs.map((r) => `<span class="chip interrupted">${esc(r)} interrupted</span>`).join('')}</div>` : ''
+}
+
 // Total tokens and agent time the job's agents reported; shown so cost stays visible
 function tokens(job) {
   const runs = Object.keys(job.tokens || {}).length
@@ -154,7 +162,8 @@ function card(job) {
     `<div class="round"><span class="n">R${i + 1}</span>${Object.keys(job.reviews).map((k) => `<span class="chip ${r[k]}">${k}</span>`).join('')}</div>`
   ).join('')
   return `<div class="card ${['ready', 'needs-human'].includes(job.stage) ? 'human' : ''}" tabindex="0" data-id="${esc(job.id)}">
-    <div class="id">${esc(job.id)}</div><div class="feat">${esc(job.feature || '')}</div>${rounds}${tokens(job)}</div>`
+    <div class="id">${esc(job.id)}${job.after ? `<span class="after">after ${esc(job.after.slice(0, 3))}</span>` : ''}</div>
+    <div class="feat">${esc(job.feature || '')}</div>${rounds}${interrupted(job)}${tokens(job)}</div>`
 }
 
 function render(jobs) {

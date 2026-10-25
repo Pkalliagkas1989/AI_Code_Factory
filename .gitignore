@@ -3,3 +3,6 @@
 !/factory/jobs/.gitkeep
 
 .DS_Store
+
+# Python bytecode from the factory script tests
+__pycache__/

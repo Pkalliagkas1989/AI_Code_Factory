@@ -136,3 +136,6 @@ it, or why you left it.
 If you can't meet the spec (it contradicts itself, it needs a human decision,
 or the environment is broken), make the first line `STATUS: BLOCKED` and explain
 under a `## Blocked` heading. Never claim READY around a failure.
+
+Before you report BLOCKED because of a tool result (an empty read, a command
+with no output, a timeout), run it once more. A one-off glitch is not a block.

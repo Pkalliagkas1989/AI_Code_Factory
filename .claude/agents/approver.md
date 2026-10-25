@@ -75,6 +75,11 @@ Recommend HOLD when any of those fails, or when the change:
 - depends on a spec Assumption that is really a product or business decision
   (pricing, public business copy, what is free or paid).
 
+The config's **Decided by the human** section lists calls the human has
+already made. A point covered there is settled: don't recommend HOLD for it
+again, and name the decision under **Your decision** so the human sees which
+one you relied on. Hold only when the change goes beyond what was decided.
+
 ## Writing for the human
 
 The reader may not be a developer. Use short sentences and everyday words. Say
@@ -168,5 +173,8 @@ instead.
   the job id, and a merge message written for this job. Each `-m` becomes one
   paragraph of the message. Inside the quotes, don't use `"`, `$` or backticks,
   because the shell would interpret them.
+- If another job builds on this one (a `job.json` in `factory/jobs/` whose
+  `after` is this job's id), leave out `git branch -d` and the worktree removal
+  for this job, and say which job still needs the branch.
 - Write the commands even when you recommend HOLD, so the human can still merge
   if they decide to.
