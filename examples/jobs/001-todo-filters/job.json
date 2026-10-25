@@ -1,0 +1,38 @@
+{
+  "id": "001-todo-filters",
+  "feature": "Add filter buttons below the list to show All, Active or Completed todos, and a \"Clear completed\" button that removes all finished todos.",
+  "branch": "factory/001-todo-filters",
+  "worktree": "/Users/pkalliag/Dev/AI_Code_Factory-factory/001-todo-filters",
+  "stage": "merged",
+  "round": 1,
+  "reviews": {
+    "security": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "code": "PASS"
+  },
+  "tokens": {
+    "spec-writer": 13790,
+    "builder r1": 29492,
+    "ux r1": 11465,
+    "code r1": 14133,
+    "security r1": 13933,
+    "ui r1": 13068,
+    "code r1 retry": 15106,
+    "approver": 20389
+  },
+  "reviewed": {
+    "1": "d0d998f"
+  },
+  "head": "d0d998f1cb9b2faaba74835c6e179415640d26ae",
+  "seconds": {
+    "spec-writer": 34,
+    "builder r1": 134,
+    "ux r1": 11,
+    "code r1": 11,
+    "security r1": 16,
+    "ui r1": 19,
+    "code r1 retry": 7,
+    "approver": 34
+  }
+}

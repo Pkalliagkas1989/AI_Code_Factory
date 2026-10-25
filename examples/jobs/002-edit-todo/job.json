@@ -1,0 +1,47 @@
+{
+  "id": "002-edit-todo",
+  "feature": "Let people edit a todo's text by double-clicking it. Enter or clicking away saves, Escape cancels, and saving empty text deletes the todo.",
+  "branch": "factory/002-edit-todo",
+  "worktree": "/Users/pkalliag/Dev/AI_Code_Factory-factory/002-edit-todo",
+  "stage": "merged",
+  "round": 2,
+  "reviews": {
+    "security": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "code": "PASS"
+  },
+  "tokens": {
+    "spec-writer": 14322,
+    "builder r1": 42188,
+    "ui r1": 9428,
+    "ux r1": 11820,
+    "code r1": 14110,
+    "security r1": 14607,
+    "builder r2": 47056,
+    "ui r2": 8251,
+    "code r2": 12550,
+    "ux r2": 11900,
+    "security r2": 13888,
+    "approver": 20090
+  },
+  "seconds": {
+    "spec-writer": 38,
+    "builder r1": 343,
+    "ui r1": 10,
+    "ux r1": 12,
+    "code r1": 16,
+    "security r1": 23,
+    "builder r2": 45,
+    "ui r2": 8,
+    "code r2": 11,
+    "ux r2": 11,
+    "security r2": 20,
+    "approver": 39
+  },
+  "reviewed": {
+    "1": "d3963de",
+    "2": "9f0512e"
+  },
+  "head": "9f0512e62753745709fde2e372b40d1a34766f4a"
+}
