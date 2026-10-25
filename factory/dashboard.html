@@ -122,13 +122,13 @@ async function loadRounds(job) {
 const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0)
 const duration = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
 
-// Total tokens and agent time the job's agents reported; shown so cost stays visible
 // Runs cut short by a usage limit or a crash, until their cost is recorded
 function interrupted(job) {
   const runs = Object.keys(job.interrupted || {})
   return runs.length ? `<div class="round">${runs.map((r) => `<span class="chip interrupted">${esc(r)} interrupted</span>`).join('')}</div>` : ''
 }
 
+// Total tokens and agent time the job's agents reported; shown so cost stays visible
 function tokens(job) {
   const runs = Object.keys(job.tokens || {}).length
   if (!runs) return ''
