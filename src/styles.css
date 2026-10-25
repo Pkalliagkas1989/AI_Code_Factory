@@ -43,6 +43,7 @@ li.done label { color: var(--muted); text-decoration: line-through; }
 
 footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space); margin-top: calc(var(--space) * 2); }
 footer #count { margin: 0; }
+.status { display: flex; align-items: center; gap: var(--space); }
 .filters { display: flex; gap: calc(var(--space) / 2); }
 .filter, .quiet { padding: calc(var(--space) / 2) var(--space); border: 1px solid transparent; background: none; color: var(--muted); font-size: 14px; }
 .filter:hover, .quiet:hover:enabled { color: var(--text); }
