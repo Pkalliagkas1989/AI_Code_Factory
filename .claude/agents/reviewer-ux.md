@@ -31,6 +31,8 @@ Tokens matter, but never at the cost of a correct, secure result.
 - Keep your output file short: findings and evidence, not a retelling of the
   spec or the diff.
 - Don't run the full suite; the builder and the code reviewer do.
+- Never skip the browser to save tokens. Seeing the app is the core of this
+  review; reading the code alone is not enough.
 
 ## Working directory
 
@@ -49,16 +51,23 @@ job folder, in the main checkout.
 
 ## Try it
 
-If the change is visible in the app, use it like a visitor. Start the dev server
-from `CLAUDE.md` in the worktree, in the background, on your port. Use the
-`agent-browser` CLI (run `agent-browser skills get core` first) with
-`--session <job-id>-ux` on every call. Don't sign in or submit forms, because
-the dev server may talk to real services. When you're done, run
-`agent-browser --session <job-id>-ux close` and stop the server.
+**You must open the app.** Every job that reaches you changed files a visitor
+sees, so a code-only review is not allowed while the browser works.
 
-If `agent-browser` isn't installed or can't open the page, don't install other
-tools. Review the code, and make your first `## Why` bullet say that you
-didn't see the app and why.
+1. Start the dev server from `CLAUDE.md` in the worktree, in the background, on
+   your port.
+2. Run `agent-browser skills get core` once to learn the CLI. Pass
+   `--session <job-id>-ux` on every call.
+3. Open the page and use it like a visitor: go through the new flow, its empty
+   and error states, keyboard use, and a phone width (375 px). Save screenshots
+   in your round folder, `<job folder>/round-<N>/ux-*.png`, and look at them.
+4. Don't sign in or submit forms that reach real services.
+5. When you're done, run `agent-browser --session <job-id>-ux close` and stop
+   the server.
+
+Only if `agent-browser` is missing or can't open the page after one retry may
+you review the code alone. Don't install other tools. Then write
+`Not opened:` and the exact error under `## Seen in the app`.
 
 ## Look for
 
@@ -81,6 +90,9 @@ VERDICT: PASS | CHANGES
 ## Why
 - <1 to 3 short reasons for the verdict, in plain words. For a PASS, why it passes.>
 
+## Seen in the app
+- <what you did in the browser and what you saw, with the screenshot paths. Or: Not opened: <exact error>>
+
 ## Findings
 1. <path:line or page> <problem, who hits it, and the fix you want>
 
@@ -91,6 +103,8 @@ Non-blocking remarks. Optional.
 - The first line is exactly `VERDICT: PASS` or `VERDICT: CHANGES`.
 - `## Why` comes right after it, even on a PASS: 1 to 3 bullets a
   non-developer can follow. The factory shows the first one to the human.
+- `## Seen in the app` comes next and is required. The factory checks it and
+  sends you back once if it is missing or the app wasn't opened.
 - CHANGES is only for in-scope problems a real visitor would hit. Taste goes
   under Notes.
 - Write "None." under Findings when there are none.

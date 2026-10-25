@@ -32,7 +32,7 @@ the main checkout. Each command prints JSON or one word.
 | `F new <slug> "<feature>"` | Claims the next job id, writes `job.json`, creates the worktree on `factory/<job-id>` from the base branch. Prints paths, ports and `prompt_prefix`. |
 | `F info <job-id>` | Prints the same for an existing job. |
 | `F start-round <job-id> <N>` | Chooses the reviewers (`run` and `skipped` with reasons), records the round, prints `security_model`. |
-| `F verdict <job-id> <N> <lens>` | Checks the review file's first line, records it, prints the reviewer's first reason (`why`) and `round_result`: `pending`, `PASS` or `CHANGES`. |
+| `F verdict <job-id> <N> <lens>` | Checks the review file's first line, records it, prints the reviewer's first reason (`why`) and `round_result`: `pending`, `PASS` or `CHANGES`. For UX and UI it also prints `seen_in_app` and `browser`. |
 | `F build <job-id>` | Prints `READY` or `BLOCKED` from `build.md` (BLOCKED sets `needs-human`). |
 | `F approve <job-id>` | Records the head commit and sets stage `approve`. |
 | `F decision <job-id>` | Prints `MERGE` or `HOLD` from `decision.md` and sets `ready` or `needs-human`. |
@@ -91,7 +91,10 @@ job has at most three review rounds.
    installed.
 2. Spawn every lens in `run` **in a single message** so they run in parallel:
    `reviewer-<lens>` with `<paths> Review round N. Port: <port>.` Give
-   `reviewer-security` `model: <security_model>`.
+   `reviewer-security` `model: <security_model>`. When `browser` is `true`,
+   end the `ux` and `ui` prompts with
+   `Open the app with agent-browser before you write your review, and fill in ## Seen in the app. A code-only review will be sent back.`
+   (Reviewers skipped the browser when this lived only in their own file.)
 3. As each returns, run `F verdict <job-id> <N> <lens>` right away so the
    dashboard updates live, and tell the user the verdict with its `why`.
    Never message the builder mid-round. Only the file counts: never take a
@@ -102,6 +105,12 @@ job has at most three review rounds.
      user (see **Troubleshooting**).
    - **`why` is `null`:** the reviewer left out its reasons. Say so in the
      update; the verdict still stands.
+   - **`seen_in_app` is `false` while `browser` is `true`** (UX and UI only):
+     the reviewer didn't open the app, which its instructions require. Send it
+     **one** reminder:
+     `You didn't open the app. Start the dev server on your port, look at the change with agent-browser as your instructions say, then rewrite <job folder>/round-<N>/review-<lens>.md with what you saw under ## Seen in the app. Your verdict may change.`
+     Run `F verdict` again. If it's still `false`, record the verdict and tell
+     the user that this review only read the code.
 4. When the last verdict is in, act on `round_result`:
    - `PASS`: go to **Approve**.
    - `CHANGES`, resumes left: `F set <job-id> stage=build`, then `SendMessage` to
