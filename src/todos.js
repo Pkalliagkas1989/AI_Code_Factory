@@ -20,6 +20,11 @@ export function remaining(todos) {
   return todos.filter((t) => !t.done).length
 }
 
+export function itemsLeftLabel(todos) {
+  const n = remaining(todos)
+  return `${n} ${n === 1 ? 'item' : 'items'} left`
+}
+
 export function filterTodos(todos, filter) {
   if (filter === 'active') return todos.filter((t) => !t.done)
   if (filter === 'completed') return todos.filter((t) => t.done)

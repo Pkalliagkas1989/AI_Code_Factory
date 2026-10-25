@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addTodo, toggleTodo, removeTodo, remaining, filterTodos, clearCompleted, editTodo } from '../src/todos.js'
+import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, editTodo } from '../src/todos.js'
 
 test('addTodo trims text and gives the next id', () => {
   const todos = addTodo(addTodo([], ' Buy milk '), 'Walk dog')
@@ -26,6 +26,20 @@ test('removeTodo and remaining', () => {
   todos = toggleTodo(todos, 1)
   assert.equal(remaining(todos), 1)
   assert.deepEqual(removeTodo(todos, 1).map((t) => t.id), [2])
+})
+
+test('itemsLeftLabel uses the singular only for one active todo', () => {
+  assert.equal(itemsLeftLabel([]), '0 items left')
+  assert.equal(itemsLeftLabel(addTodo([], 'a')), '1 item left')
+  assert.equal(itemsLeftLabel(addTodo(addTodo([], 'a'), 'b')), '2 items left')
+})
+
+test('itemsLeftLabel ignores done todos and does not mutate', () => {
+  const before = toggleTodo(addTodo(addTodo(addTodo([], 'a'), 'b'), 'c'), 2)
+  const copy = structuredClone(before)
+  assert.equal(itemsLeftLabel(before), '2 items left')
+  assert.equal(itemsLeftLabel(toggleTodo(before, 1)), '1 item left')
+  assert.deepEqual(before, copy)
 })
 
 function sample() {
