@@ -4,16 +4,21 @@
 Run every command from the main checkout. Each prints JSON (or one word) on
 stdout. Exit code 1 means stop and tell the user: stderr says why.
 
-  new <slug> <feature>      claim a job id, write job.json, create the worktree
-  info <job-id>             paths, ports and the prompt prefix for a job
+  new <slug> <feature> [--after <job>]
+                            claim a job id, write job.json, create the worktree
+                            (from the base branch, or on top of another job's branch)
+  info <job-id>             paths, ports, the prompt prefix and the human's decisions
+  resume <job-id>           what runs next, after an interruption or a lost session
+  interrupt <job-id> <run>  record that an agent run stopped early (usage limit, crash)
   start-round <job-id> <N>  choose this round's reviewers and record the round
   verdict <job-id> <N> <lens>  read and record one reviewer's verdict
-  build <job-id>            read build.md's status (READY or BLOCKED)
+  build <job-id>            read build.md's status (READY, RETRY or BLOCKED)
   approve <job-id>          record the reviewed head and enter the approve stage
   decision <job-id>         read decision.md's recommendation (MERGE or HOLD)
   done <job-id>             check the merge reached the base branch
   set <job-id> key=value…   set stage, or record a run's cost:
                             "tokens.builder r1=48128" "seconds.builder r1=134"
+                            (+= adds to it, for a run resumed after an interruption)
 """
 import fnmatch
 import json
@@ -22,6 +27,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 STAGES = ("spec", "build", "review", "approve", "ready", "needs-human", "merged")
@@ -66,6 +72,9 @@ def config():
         "light": split(keys.get("light_paths", "")),
         "paths": {k[len("paths."):]: split(v) for k, v in keys.items() if k.startswith("paths.")},
     }
+    # "## Decided by the human": product calls already made, so agents don't hold on them again
+    decided = re.search(r"^## Decided by the human\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
+    cfg["decided"] = re.findall(r"^\s*[-*]\s+(.+?)\s*$", decided[1], re.M) if decided else []
     if not cfg["reviewers"]:
         fail("config.md has no reviewers line")
     missing = {"security", "code"} - set(cfg["always"])
@@ -79,6 +88,23 @@ def job_dir(job_id):
     if not (d / "job.json").is_file():
         fail(f"no job {job_id} (expected {d}/job.json)")
     return d
+
+
+def find_job(ref):
+    """A job by full id or by its 3-digit number."""
+    jobs = repo() / "factory" / "jobs"
+    if re.fullmatch(r"\d{3}", ref):
+        hits = [p.name for p in jobs.glob(f"{ref}-*") if (p / "job.json").is_file()] if jobs.is_dir() else []
+        if not hits:
+            fail(f"no job {ref}")
+        return hits[0]
+    job_dir(ref)
+    return ref
+
+
+def base_of(job, cfg):
+    # Jobs record their own base; older job.json files predate that
+    return job.get("base") or cfg["base"]
 
 
 def load(job_id):
@@ -106,24 +132,34 @@ def first_line(path, pattern, what):
 def info(job, cfg):
     root = repo()
     n = int(job["id"][:3])
+    base = base_of(job, cfg)
     paths = (f"Job folder: {root}/factory/jobs/{job['id']}. Worktree: {job['worktree']}. "
-             f"Branch: {job['branch']}. Base: {cfg['base']}. Config: {root}/factory/config.md.")
+             f"Branch: {job['branch']}. Base: {base}. Config: {root}/factory/config.md.")
     return {
         "id": job["id"],
         "branch": job["branch"],
         "worktree": job["worktree"],
         "job_folder": f"{root}/factory/jobs/{job['id']}",
-        "base": cfg["base"],
+        "base": base,
+        "after": job.get("after"),
         "prompt_prefix": paths,
         "builder_port": 5100 + 10 * n,
         "reviewer_ports": {lens: 5101 + 10 * n + i for i, lens in enumerate(cfg["reviewers"])},
+        "decided": cfg["decided"],
     }
 
 
-def cmd_new(slug, feature):
+def cmd_new(slug, feature, *rest):
     if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+){0,3}", slug):
         fail("slug must be 1 to 4 lowercase words joined by '-'")
+    if rest and (len(rest) != 2 or rest[0] != "--after"):
+        fail("new takes <slug> <feature> and optionally --after <job>")
     cfg = config()
+    # A chain: build on an earlier job's branch instead of the config's base
+    after = find_job(rest[1]) if rest else None
+    base = load(after)["branch"] if after else cfg["base"]
+    if git("rev-parse", "--verify", "--quiet", base, check=False).returncode:
+        fail(f"base branch {base} does not exist")
     root = repo()
     jobs = root / "factory" / "jobs"
     claims = jobs / ".claims"  # one empty file per number; hidden from the dashboard
@@ -145,12 +181,14 @@ def cmd_new(slug, feature):
         "feature": feature,
         "branch": f"factory/{job_id}",
         "worktree": str(root.parent / f"{root.name}-factory" / job_id),
+        "base": base,
+        "after": after,
         "stage": "spec",
         "round": 0,
         "reviews": {lens: "pending" for lens in cfg["reviewers"]},
     }
     save(job)
-    git("worktree", "add", "-b", job["branch"], job["worktree"], cfg["base"])
+    git("worktree", "add", "-b", job["branch"], job["worktree"], base)
     out(info(job, cfg))
 
 
@@ -161,7 +199,7 @@ def light_match(path, patterns):
 def cmd_start_round(job_id, n):
     n = int(n)
     job, cfg = load(job_id), config()
-    branch, base = job["branch"], cfg["base"]
+    branch, base = job["branch"], base_of(job, cfg)
     whole = git("diff", "--name-only", f"{base}...{branch}").stdout.split()
     if n == 1:
         changed = whole
@@ -224,10 +262,22 @@ def cmd_verdict(job_id, n, lens):
     out(report)
 
 
+def new_commits(job, cfg):
+    since = job.get("reviewed", {}).get(str(job["round"])) or base_of(job, cfg)
+    return int(git("rev-list", "--count", f"{since}..{job['branch']}").stdout.strip())
+
+
 def cmd_build(job_id):
-    job = load(job_id)
+    job, cfg = load(job_id), config()
     status = first_line(job_dir(job_id) / "build.md", r"STATUS: (READY|BLOCKED)", "builder")
     if status == "BLOCKED":
+        # A block with nothing committed is often a glitch (an empty read, a dropped
+        # tool call): one automatic retry per round before it reaches the human
+        if new_commits(job, cfg) == 0 and job.get("retried") != job["round"]:
+            job["retried"] = job["round"]
+            save(job)
+            out("RETRY")
+            return
         job["stage"] = "needs-human"
         save(job)
     out(status)
@@ -252,8 +302,9 @@ def cmd_done(job_id):
     job, cfg = load(job_id), config()
     if job["stage"] not in ("ready", "needs-human") or not job.get("head"):
         fail(f"{job_id} is in stage {job['stage']}; only a job waiting for you can be marked done")
-    if git("merge-base", "--is-ancestor", job["head"], cfg["base"], check=False).returncode:
-        fail(f"{job_id} is not merged into {cfg['base']} yet; run the Commands in decision.md first")
+    base = base_of(job, cfg)
+    if git("merge-base", "--is-ancestor", job["head"], base, check=False).returncode:
+        fail(f"{job_id} is not merged into {base} yet; run the Commands in decision.md first")
     job["stage"] = "merged"
     save(job)
     out({
@@ -275,15 +326,52 @@ def cmd_set(job_id, *pairs):
             job["stage"] = value
         elif key.split(".")[0] in ("tokens", "seconds") and "." in key and value.isdigit():
             field, run = key.split(".", 1)
-            job.setdefault(field, {})[run] = int(value)
+            add = run.endswith("+")
+            run = run.rstrip("+").strip()
+            costs = job.setdefault(field, {})
+            costs[run] = costs.get(run, 0) + int(value) if add else int(value)
+            # A recorded cost means the run finished
+            job.get("interrupted", {}).pop(run, None)
         else:
             fail(f"set only takes stage=…, tokens.<run>=<number> or seconds.<run>=<number>, got {key!r}")
     save(job)
     out("ok")
 
 
+def cmd_interrupt(job_id, run):
+    job = load(job_id)
+    job.setdefault("interrupted", {})[run] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    save(job)
+    out("ok")
+
+
+def cmd_resume(job_id):
+    job, cfg = load(job_id), config()
+    d = job_dir(job_id)
+    stage, n = job["stage"], job["round"]
+    pending = [lens for lens, v in job["reviews"].items() if v == "pending"] if stage == "review" else []
+    if stage == "spec":
+        step = "builder" if (d / "spec.md").is_file() else "spec-writer"
+    elif stage == "build":
+        # Builder still owes work when build.md is missing, the run was cut short,
+        # or nothing was committed since the last reviewed round
+        owed = (not (d / "build.md").is_file() or any(r.startswith("builder") for r in job.get("interrupted", {}))
+                or (n > 0 and new_commits(job, cfg) == 0))
+        step = "builder" if owed else f"start-round {n + 1}"
+    elif stage == "review":
+        values = job["reviews"].values()
+        step = "reviewers" if pending else ("builder" if "CHANGES" in values else "approve")
+    elif stage == "approve":
+        step = "decision" if (d / "decision.md").is_file() else "approver"
+    else:
+        step = "none" if stage == "merged" else "human"
+    out({"id": job_id, "stage": stage, "round": n, "next": step, "pending_lenses": pending,
+         "interrupted": sorted(job.get("interrupted", {}))})
+
+
 COMMANDS = {
-    "new": (cmd_new, 2), "info": (lambda j: out(info(load(j), config())), 1),
+    "new": (cmd_new, (2, 4)), "info": (lambda j: out(info(load(j), config())), 1),
+    "resume": (cmd_resume, 1), "interrupt": (cmd_interrupt, 2),
     "start-round": (cmd_start_round, 2), "verdict": (cmd_verdict, 3), "build": (cmd_build, 1),
     "approve": (cmd_approve, 1), "decision": (cmd_decision, 1), "done": (cmd_done, 1),
     "set": (cmd_set, None),
@@ -294,6 +382,7 @@ if __name__ == "__main__":
     if name not in COMMANDS:
         fail(__doc__)
     fn, argc = COMMANDS[name]
-    if len(args) != argc if argc is not None else len(args) < 2:
-        fail(f"{name} takes {argc or 'at least 2'} argument(s)\n{__doc__}")
+    counts = argc if isinstance(argc, tuple) else (argc,)
+    if len(args) not in counts if argc is not None else len(args) < 2:
+        fail(f"{name} takes {' or '.join(map(str, counts)) if argc else 'at least 2'} argument(s)\n{__doc__}")
     fn(*args)

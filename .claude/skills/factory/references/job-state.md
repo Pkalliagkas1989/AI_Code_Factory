@@ -29,7 +29,7 @@ decision.md                   approver
 
 ```json
 { "id": "004-contact-form", "feature": "Add a contact form to the about page",
-  "branch": "factory/004-contact-form",
+  "branch": "factory/004-contact-form", "base": "main", "after": null,
   "worktree": "/Users/me/Dev/my-app-factory/004-contact-form",
   "stage": "review", "round": 1,
   "reviews": { "security": "PASS", "ux": "pending", "ui": "pending", "code": "CHANGES" },
@@ -37,6 +37,10 @@ decision.md                   approver
   "tokens": { "spec-writer": 47430, "builder r1": 48128 } }
 ```
 
+- `base`: the branch the job started from and merges back into: the config's
+  `base_branch`, or with `F new --after <job>` that job's branch. Older
+  job.json files without it use the config's `base_branch`.
+- `after`: the job this one builds on, or `null`. The dashboard shows it.
 - `stage`: `spec`, `build`, `review`, `approve`, `ready`, `needs-human` or
   `merged`. Worktree setup counts as `spec`. `ready` means the approver
   recommends merging and the human has not merged yet.
@@ -50,7 +54,12 @@ decision.md                   approver
 - `tokens`: tokens per agent run, only when the agent's result reports them.
   Never guessed.
 - `seconds`: how long each agent run took, same run names as `tokens`. The
-  dashboard shows both per run when a card is opened (**cost**).
+  dashboard shows both per run when a card is opened (**cost**). `+=` adds to
+  a run, so a run resumed after an interruption counts both parts.
+- `interrupted`: runs that stopped early, with the time (`F interrupt`).
+  Recording a run's cost removes it.
+- `retried`: the round in which a BLOCKED build with nothing committed was sent
+  back once automatically (`F build` printed `RETRY`).
 
 The file is rewritten whole on every change, through a temporary file and a
 rename, so the dashboard never reads half of it.

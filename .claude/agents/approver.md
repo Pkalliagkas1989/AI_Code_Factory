@@ -75,6 +75,11 @@ Recommend HOLD when any of those fails, or when the change:
 - depends on a spec Assumption that is really a product or business decision
   (pricing, public business copy, what is free or paid).
 
+The config's **Decided by the human** section lists calls the human has
+already made. A point covered there is settled: don't recommend HOLD for it
+again, and name the decision under **Your decision** so the human sees which
+one you relied on. Hold only when the change goes beyond what was decided.
+
 ## Writing for the human
 
 The reader may not be a developer. Use short sentences and everyday words. Say

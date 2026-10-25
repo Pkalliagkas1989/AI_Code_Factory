@@ -1,9 +1,9 @@
 ---
 name: factory
-description: Runs the AI code factory, which takes one feature request through spec, build, parallel review and approval on its own git branch. Use when the user types /factory followed by a feature request, /factory next (optionally with a count), /factory done with a job id, or /factory rework with a job id and a note. The session running it becomes the orchestrator of one job. Do not use for ordinary coding requests without /factory. The human always does the merge.
+description: Runs the AI code factory, which takes one feature request through spec, build, parallel review and approval on its own git branch. Use when the user types /factory followed by a feature request, /factory next (optionally with a count), /factory chain with a count, /factory resume, /factory done or /factory rework with a job id. The session running it becomes the orchestrator of one job. Do not use for ordinary coding requests without /factory. The human always does the merge.
 compatibility: Claude Code only. Needs git with worktree support, python3, and the factory agents in .claude/agents/ (spec-writer, builder, reviewer-*, approver).
 metadata:
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # /factory: the orchestrator
@@ -29,21 +29,25 @@ the main checkout. Each command prints JSON or one word.
 
 | Command | Does |
 | --- | --- |
-| `F new <slug> "<feature>"` | Claims the next job id, writes `job.json`, creates the worktree on `factory/<job-id>` from the base branch. Prints paths, ports and `prompt_prefix`. |
+| `F new <slug> "<feature>" [--after <job>]` | Claims the next job id, writes `job.json`, creates the worktree on `factory/<job-id>` from the base branch, or with `--after` (a job id or its number) on top of that job's branch. Prints paths, ports, `prompt_prefix` and `decided`. |
 | `F info <job-id>` | Prints the same for an existing job. |
+| `F resume <job-id>` | Prints the `next` step (`spec-writer`, `builder`, `start-round N`, `reviewers` with `pending_lenses`, `approve`, `approver`, `decision`, `human`) and any `interrupted` runs. |
+| `F interrupt <job-id> "<run>"` | Records that an agent run stopped early (usage limit, crash, API error). |
 | `F start-round <job-id> <N>` | Chooses the reviewers (`run` and `skipped` with reasons), records the round, prints `security_model`. |
 | `F verdict <job-id> <N> <lens>` | Checks the review file's first line, records it, prints the reviewer's first reason (`why`) and `round_result`: `pending`, `PASS` or `CHANGES`. For UX and UI it also prints `seen_in_app` and `browser`. |
-| `F build <job-id>` | Prints `READY` or `BLOCKED` from `build.md` (BLOCKED sets `needs-human`). |
+| `F build <job-id>` | Prints `READY`, `RETRY` (BLOCKED with nothing committed, first time this round) or `BLOCKED` (sets `needs-human`). |
 | `F approve <job-id>` | Records the head commit and sets stage `approve`. |
 | `F decision <job-id>` | Prints `MERGE` or `HOLD` from `decision.md` and sets `ready` or `needs-human`. |
 | `F done <job-id>` | Checks the merge reached the base branch and sets `merged`. |
-| `F set <job-id> stage=<stage>` / `"tokens.<run>=<n>"` / `"seconds.<run>=<n>"` | Sets the stage, or records an agent run's tokens and duration. |
+| `F set <job-id> stage=<stage>` / `"tokens.<run>=<n>"` / `"seconds.<run>=<n>"` | Sets the stage, or records an agent run's tokens and duration. `+=` adds to a run's cost. |
 
 Record each agent run's tokens and duration (whole seconds) with `F set` when
 its result reports them, in one call:
 `F set <job-id> "tokens.builder r1=29492" "seconds.builder r1=134"`. Name runs
 `spec-writer`, `builder r1`, `security r1`, … and add `retry` to a reminded
-reviewer's run (`code r1 retry`). Never guess a number.
+reviewer's run (`code r1 retry`). Never guess a number. When a resumed run
+reports its cost, add it with `+=` so both parts count:
+`F set <job-id> "tokens.builder r1+=15309"`.
 
 Paths, `job.json` fields, ports and the reviewer-selection rules are in
 `references/job-state.md`. Read it only when a result needs explaining.
@@ -64,8 +68,10 @@ job has at most three review rounds.
 ## /factory FEATURE
 
 1. **Read the config** `factory/config.md`, then pick a 2–4 word kebab-case slug.
-2. **Start the job:** `F new <slug> "<feature, verbatim>"`. Keep its output: every
-   agent prompt starts with `prompt_prefix`, written `<paths>` below.
+2. **Start the job:** `F new <slug> "<feature, verbatim>"`. When the user says the
+   job builds on an earlier unmerged job ("on top of 009"), add `--after <job>`;
+   never edit `base_branch` for that. Keep its output: every agent prompt starts
+   with `prompt_prefix`, written `<paths>` below.
 3. **Set up the worktree.** Inside the worktree, run the fresh-checkout setup
    from the project's `CLAUDE.md` (or `AGENTS.md`), then the config's
    **Setup for a new worktree**. If a step fails, stop and tell the user.
@@ -80,8 +86,27 @@ job has at most three review rounds.
 `F build <job-id>`:
 
 - `READY`: start the next review round.
+- `RETRY`: the builder stopped without committing anything, which is usually a
+  glitch (an empty read, a dropped tool call). Tell the user in one line, then
+  `SendMessage` to `builder-<job-id>`:
+  `Your build stopped with nothing committed. Start again from where you were: re-read what came back empty, then build, commit and rewrite build.md. Report BLOCKED only if the same problem happens again.`
+  Then **Check the build** again. This happens at most once per round.
 - `BLOCKED`: tell the user the job id and worktree path, quote the `## Blocked`
   section of `build.md`, and suggest `/factory rework <job-id> <note>`. Stop.
+
+### When an agent stops early
+
+A usage limit, an API error or a crash ends an agent's run without its file.
+
+1. `F interrupt <job-id> "<run>"` (for example `"builder r1"`), so the dashboard
+   shows it. Tell the user in one line, with the reset time if there is one.
+2. When it can run again, `SendMessage` to the same agent (its name or id):
+   `You were interrupted. Continue from where you stopped; don't redo finished work.`
+   Starting a fresh agent loses its work so far.
+3. When it reports its cost, record it with `+=`. That also clears the
+   interruption.
+
+If this session itself was lost, `/factory resume <job-id>` picks the job up.
 
 ### Review round N
 
@@ -130,7 +155,7 @@ department did** and **Your decision** sections, and the **Commands** block
 exactly as written. Say plainly that nothing has been merged, and that after
 running the commands they run `/factory done <job-id>`.
 
-## /factory next, done and rework
+## /factory next, chain, resume, done and rework
 
 Read `references/commands.md` and follow it.
 

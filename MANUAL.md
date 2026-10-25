@@ -63,20 +63,27 @@ Setup takes 6 steps and is done once per project. A developer usually does it; a
 | `paths.<reviewer>` | Folders that trigger an optional reviewer. Example: `paths.ux: src/` means the UX review runs only when files in `src/` changed. A reviewer with no `paths` line always runs. | `paths.ux: src/`, `paths.ui: src/` |
 | `light_paths` | Low-risk files, such as documentation. When every changed file matches, the security review uses a cheaper model. It still runs. | `*.md, docs/` |
 | Setup for a new worktree | Extra commands run in each new job folder, after the setup in `CLAUDE.md`. | empty |
+| Decided by the human | Product decisions you have already made, one per line with the date, such as "The Engineer role has no password in the prototype (2026-10-25)". The spec writer follows them and the approver no longer says HOLD for them. | empty |
 | Notes for agents | Facts every agent must know that `CLAUDE.md` doesn't say. A merge-check command written here is added to the approver's merge steps. | empty |
 
 The review checklists are general on purpose. Once you know what matters most in your project, ask Claude to tailor the reviewer files in `.claude/agents/` to your stack.
 
-## 3. The four commands
+## 3. The commands
 
-You control the factory with four commands, typed into Claude Code inside your project folder.
+You control the factory with these commands, typed into Claude Code inside your project folder.
 
 | Command | When to use it | Example |
 | --- | --- | --- |
 | `/factory <feature>` | Start a new job from a feature description. | `/factory Add a contact form to the about page` |
 | `/factory next [n]` | Take the next item from the backlog list. With `n` (2 or 3), group up to that many small items into one job. | `/factory next` or `/factory next 3` |
+| `/factory chain <n>` | Run the next `n` backlog items as separate jobs, each built on top of the one before, without merging in between. Use it for a plan whose tasks depend on each other. Add `after <job-id>` to start on top of an existing job. | `/factory chain 3` |
+| `/factory resume <job-id>` | Pick a job up again after a usage limit, a crash or a closed session. The factory works out which step comes next. | `/factory resume 008-roles-and-menu` |
 | `/factory done <job-id>` | Tell the factory you have merged a job. It checks the merge really happened and marks the job merged. | `/factory done 004-contact-form` |
 | `/factory rework <job-id> <note>` | Send a finished job back to the builder with your feedback, instead of merging. | `/factory rework 004-contact-form Make the submit button blue and add a phone field` |
+
+### Building on a job that is not merged yet
+
+To build a feature on top of an earlier job before you merge it, say so in the request, for example `/factory On top of job 009: add a side view of the mission`. The new job starts from job 009's branch, and its merge commands merge into that branch. You never need to change `base_branch` for this.
 
 ### Writing a good feature request
 
@@ -197,7 +204,7 @@ HOLD does not mean the work is bad. It means a human must look first. The approv
 - touches money, access or identity: payments, login, permissions, or database security rules;
 - changes deployment, CI, hosting settings or build scripts;
 - changes a database structure, sends email, writes production data, or adds a new third-party package;
-- relies on an assumption that is really a business decision, such as prices or public wording;
+- relies on an assumption that is really a business decision, such as prices or public wording, unless it is already listed under **Decided by the human** in `factory/config.md`;
 - still has open review findings after the last round, or fails any merge check.
 
 Read the **Your decision** section, answer its question, and then either merge or send it back.
@@ -260,5 +267,9 @@ Click a card to read its files (spec, build report, reviews, decision). The firs
 **Do my colleagues see the change after I merge?** Only after `git push origin main`. Merging alone changes only your computer.
 
 **How much does a job cost?** A job that passes in one round uses 5 to 7 agent runs (spec writer, builder, 2 to 4 reviewers, approver); each fix round adds more. The first test job, a small feature on a small app, used 131,000 tokens over 8 runs: about 11,000 to 15,000 per reviewer, 29,000 for the builder and 20,000 for the approver. Bigger projects cost more. Open a job's card on the dashboard and choose **cost** to see every run's tokens and time.
+
+**What if Claude hits its usage limit in the middle of a job?** Nothing is lost. The interrupted run is marked on the dashboard, and the same agent continues where it stopped once the limit resets. If the whole session closed, run `/factory resume <job-id>`. Both parts of the run are counted in the cost.
+
+**The builder said BLOCKED but changed nothing. Why did it carry on?** A block with nothing committed is usually a glitch, such as a file read that came back empty. The factory sends the builder back once by itself. If it is blocked again, the job comes to you.
 
 **Where do I learn more?** Read `README.md` in the repository, and the agent instructions in `.claude/agents/`.

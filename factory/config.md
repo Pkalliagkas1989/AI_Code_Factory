@@ -29,6 +29,12 @@ fresh-checkout setup. Leave empty if there are none.
 ```bash
 ```
 
+## Decided by the human
+
+Product calls the human has already made, one per line, with the date. Agents
+treat them as settled: the spec-writer follows them and the approver doesn't
+hold a job for them again. Leave empty if there are none.
+
 ## Notes for agents
 
 Project facts every agent needs that `CLAUDE.md` doesn't say.
