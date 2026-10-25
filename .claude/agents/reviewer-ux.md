@@ -56,6 +56,10 @@ from `CLAUDE.md` in the worktree, in the background, on your port. Use the
 the dev server may talk to real services. When you're done, run
 `agent-browser --session <job-id>-ux close` and stop the server.
 
+If `agent-browser` isn't installed or can't open the page, don't install other
+tools. Review the code, and make your first `## Why` bullet say that you
+didn't see the app and why.
+
 ## Look for
 
 - The flow does what the spec says, with no dead ends.

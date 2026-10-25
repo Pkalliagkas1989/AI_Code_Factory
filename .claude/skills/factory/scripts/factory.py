@@ -19,6 +19,7 @@ import fnmatch
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -195,7 +196,9 @@ def cmd_start_round(job_id, n):
     for s in skipped:
         job["reviews"][s["lens"]] = "skipped"
     save(job)
-    out({"round": n, "run": run, "skipped": skipped, "security_model": "sonnet" if light else "opus"})
+    out({"round": n, "run": run, "skipped": skipped, "security_model": "sonnet" if light else "opus",
+         # Without it the builder and the UX/UI reviewers can only read the code
+         "browser": shutil.which("agent-browser") is not None})
 
 
 def cmd_verdict(job_id, n, lens):

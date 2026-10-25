@@ -127,7 +127,9 @@ less:
    backends), and any environment notes the agents need.
 5. If the project has pages to look at, install
    [`agent-browser`](https://github.com/vercel-labs/agent-browser) so the
-   builder and the UX/UI reviewers can see the running app.
+   builder and the UX/UI reviewers can see the running app:
+   `npm install -g agent-browser@0.39.0`. Without it they only read the code,
+   and `/factory` says so at the start of each review round.
 6. Commit on the base branch, open Claude Code in the project and run `/factory <feature>`.
 
 The review checklists are general on purpose. Ask Claude to tailor them to your

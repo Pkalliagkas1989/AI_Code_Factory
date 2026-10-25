@@ -71,6 +71,9 @@ and its result, or what the page showed.
   `agent-browser skills get core` once to learn it). Use
   `--session <job-id>-builder` on every call. When you're done, run
   `agent-browser --session <job-id>-builder close` and stop the server.
+  If `agent-browser` isn't installed, don't install other tools: verify those
+  criteria by reading the code and tests, and say in `build.md` which ones you
+  couldn't see in the app.
 
 ## Commit
 
