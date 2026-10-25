@@ -39,3 +39,11 @@ li.done label { color: var(--muted); text-decoration: line-through; }
 #count { color: var(--muted); font-size: 14px; }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space); margin-top: calc(var(--space) * 2); }
+footer #count { margin: 0; }
+.filters { display: flex; gap: calc(var(--space) / 2); }
+.filter, .quiet { padding: calc(var(--space) / 2) var(--space); border: 1px solid transparent; background: none; color: var(--muted); font-size: 14px; }
+.filter:hover, .quiet:hover:enabled { color: var(--text); }
+.filter[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.quiet:disabled { opacity: 0.5; cursor: default; }
