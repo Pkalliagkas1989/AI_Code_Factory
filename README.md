@@ -16,6 +16,9 @@ request ─► spec-writer ─► builder ─► security · ux · ui · code  (
                                                         + merge commands for you to run
 ```
 
+New to the factory? Read the [user manual](MANUAL.md): setup, commands,
+what happens during a job, and how to read the report and merge.
+
 Inspired by ZazenCodes' video
 [Build Your Own AI Software Factory with Claude Code](https://www.youtube.com/watch?v=ctoaIC4LHmI).
 All files here were written for this repo.
