@@ -15,7 +15,15 @@
       <button type="submit">Add</button>
     </form>
     <ul id="list"></ul>
-    <p id="count" aria-live="polite"></p>
+    <footer>
+      <p id="count" aria-live="polite"></p>
+      <div class="filters" role="group" aria-label="Show">
+        <button type="button" class="filter" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="filter" data-filter="active" aria-pressed="false">Active</button>
+        <button type="button" class="filter" data-filter="completed" aria-pressed="false">Completed</button>
+      </div>
+      <button type="button" id="clear-completed" class="quiet">Clear completed</button>
+    </footer>
   </main>
   <script type="module" src="app.js"></script>
 </body>

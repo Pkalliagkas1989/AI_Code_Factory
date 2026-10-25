@@ -19,3 +19,13 @@ export function removeTodo(todos, id) {
 export function remaining(todos) {
   return todos.filter((t) => !t.done).length
 }
+
+export function filterTodos(todos, filter) {
+  if (filter === 'active') return todos.filter((t) => !t.done)
+  if (filter === 'completed') return todos.filter((t) => t.done)
+  return [...todos]
+}
+
+export function clearCompleted(todos) {
+  return todos.filter((t) => !t.done)
+}
