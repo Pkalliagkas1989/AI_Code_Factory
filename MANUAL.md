@@ -251,7 +251,7 @@ Click a card to read its files (spec, build report, reviews, decision).
 | `git status` lists unexpected files before merging | You have unsaved work in the project. | Commit it, or ask Claude to help set it aside, before merging. |
 | A merge command prints an error | Usually a conflict with other recent changes. | Stop. Ask Claude what to do. Do not run the next step. |
 | `/factory next` says there is nothing to do | All backlog lines are checked. | Add new `- [ ]` lines to `factory/backlog.md`. |
-| A reviewer finished without writing its file | Something went wrong in that agent. | Claude stops and tells you. Re-run or ask Claude to investigate. |
+| A reviewer finished without writing its file | The reviewer answered in chat only. A chat answer never counts as a review. | Nothing. Claude reminds that reviewer once to write its file; the reviewer still decides. Only if it fails again does the job stop and ask you. |
 
 **Can the factory break my main code?** No. It works on a separate branch in a separate folder and never merges, pushes or deletes branches. Your main code changes only when you run the merge commands.
 

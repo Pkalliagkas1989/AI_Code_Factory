@@ -207,7 +207,9 @@ def cmd_verdict(job_id, n, lens):
     save(job)
     values = job["reviews"].values()
     result = "pending" if "pending" in values else ("CHANGES" if "CHANGES" in values else "PASS")
-    out({"lens": lens, "verdict": verdict, "round_result": result})
+    # The reviewer's first reason, shown to the human; None when it wrote no ## Why
+    why = re.search(r"^## Why\s*\n\s*[-*]\s*(.+)", path.read_text(), re.M)
+    out({"lens": lens, "verdict": verdict, "why": why[1].strip() if why else None, "round_result": result})
 
 
 def cmd_build(job_id):
