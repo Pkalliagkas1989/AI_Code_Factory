@@ -19,6 +19,11 @@ request ─► spec-writer ─► builder ─► security · ux · ui · code  (
 New to the factory? Read the [user manual](MANUAL.md): setup, commands,
 what happens during a job, and how to read the report and merge.
 
+Want to see it work? The
+[`example/todo-app`](https://github.com/Pkalliagkas1989/AI_Code_Factory/tree/example/todo-app/examples)
+branch is a small todo app that grows one feature at a time through
+`/factory`, with every job's spec, reviews, decision and cost kept next to it.
+
 Inspired by ZazenCodes' video
 [Build Your Own AI Software Factory with Claude Code](https://www.youtube.com/watch?v=ctoaIC4LHmI).
 All files here were written for this repo.
