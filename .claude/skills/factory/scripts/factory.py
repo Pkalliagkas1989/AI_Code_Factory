@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 STAGES = ("spec", "build", "review", "approve", "ready", "needs-human", "merged")
+BROWSER_LENSES = ("ux", "ui")  # reviews that must open the running app
 
 
 def fail(msg):
@@ -211,9 +212,16 @@ def cmd_verdict(job_id, n, lens):
     save(job)
     values = job["reviews"].values()
     result = "pending" if "pending" in values else ("CHANGES" if "CHANGES" in values else "PASS")
+    text = path.read_text()
     # The reviewer's first reason, shown to the human; None when it wrote no ## Why
-    why = re.search(r"^## Why\s*\n\s*[-*]\s*(.+)", path.read_text(), re.M)
-    out({"lens": lens, "verdict": verdict, "why": why[1].strip() if why else None, "round_result": result})
+    why = re.search(r"^## Why\s*\n\s*[-*]\s*(.+)", text, re.M)
+    report = {"lens": lens, "verdict": verdict, "why": why[1].strip() if why else None, "round_result": result}
+    if lens in BROWSER_LENSES:
+        # These reviews must look at the running app; "Not opened: …" or no section means they didn't
+        seen = re.search(r"^## Seen in the app\s*\n\s*[-*]?\s*(.+)", text, re.M)
+        report["seen_in_app"] = bool(seen) and not seen[1].strip().lower().startswith("not opened")
+        report["browser"] = shutil.which("agent-browser") is not None
+    out(report)
 
 
 def cmd_build(job_id):

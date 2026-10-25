@@ -196,7 +196,7 @@ async function openJob(id) {
   const base = `jobs/${id}/`
   const files = []
   for (const h of await listDir(base)) {
-    if (/^round-\d+\/$/.test(h)) for (const f of await listDir(base + h)) { if (f.endsWith('.md')) files.push(h + f) }
+    if (/^round-\d+\/$/.test(h)) for (const f of await listDir(base + h)) { if (/\.(md|png)$/.test(f)) files.push(h + f) }
     else if (/\.(md|json)$/.test(h)) files.push(h)
   }
   const order = (f) => ['job.json', 'spec.md', 'build.md'].indexOf(f) + 1 || (f === 'decision.md' ? 90 : 50)
@@ -209,6 +209,10 @@ async function openJob(id) {
     nav.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('on', b.dataset.f === f))
     if (f === 'cost') {
       document.getElementById('doc').innerHTML = costTable(JSON.parse(await get(base + 'job.json')))
+      return
+    }
+    if (f.endsWith('.png')) {  // reviewers' screenshots of the running app
+      document.getElementById('doc').innerHTML = `<img src="${esc(base + f)}" alt="${esc(f)}" style="max-width:100%;border:1px solid var(--line);border-radius:8px">`
       return
     }
     const text = await get(base + f)
