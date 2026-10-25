@@ -58,6 +58,10 @@ widths, passing `--session <job-id>-ui` on every call. Don't sign in or submit
 forms. When you're done, run `agent-browser --session <job-id>-ui close` and
 stop the server.
 
+If `agent-browser` isn't installed or can't open the page, don't install other
+tools. Review the code, and make your first `## Why` bullet say that you
+didn't see the app and why.
+
 ## Look for
 
 - It fits in: the same colours, type sizes, spacing, corner radii and

@@ -86,7 +86,9 @@ job has at most three review rounds.
 ### Review round N
 
 1. `F start-round <job-id> <N>`. Tell the user in one line which lenses were
-   skipped and why.
+   skipped and why. If `browser` is `false` and `ux` or `ui` will run, say
+   that those reviews can only read the code, because `agent-browser` isn't
+   installed.
 2. Spawn every lens in `run` **in a single message** so they run in parallel:
    `reviewer-<lens>` with `<paths> Review round N. Port: <port>.` Give
    `reviewer-security` `model: <security_model>`.

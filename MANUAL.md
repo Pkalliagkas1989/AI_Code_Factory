@@ -37,7 +37,7 @@ Setup takes 6 steps and is done once per project. A developer usually does it; a
 - **Claude Code** installed and signed in.
 - **git**, with the project already in a git repository.
 - **Python 3**. The factory's helper script needs it, and so does the live dashboard (section 7). On a Mac it is usually already installed; check with `python3 --version`.
-- **agent-browser** ([link](https://github.com/vercel-labs/agent-browser)), only for projects with web pages, so the agents can look at the running app.
+- **agent-browser** ([link](https://github.com/vercel-labs/agent-browser)), for projects with web pages, so the builder and the UX and design reviewers can look at the running app. Install it once with `npm install -g agent-browser@0.39.0`, and check it with `agent-browser --version`. Without it those agents only read the code, and the factory tells you so at the start of each review round.
 
 ### The 6 steps
 
@@ -50,7 +50,7 @@ Setup takes 6 steps and is done once per project. A developer usually does it; a
    ```
 3. **Describe your project.** Copy `templates/CLAUDE.md` to the project root (or merge it into an existing `CLAUDE.md`) and fill in every section: stack, folder layout, setup commands, dev server command, test commands and conventions. **This file is the only place the agents learn how your project works.** Vague answers here lead to weaker results.
 4. **Configure the factory.** Edit `factory/config.md` (see the table below).
-5. **Optional: install agent-browser** if the project has pages to look at.
+5. **Install agent-browser** if the project has pages to look at: `npm install -g agent-browser@0.39.0`.
 6. **Commit** these files on the base branch, open Claude Code in the project folder, and run your first `/factory <feature>`.
 
 ### The settings in `factory/config.md`
