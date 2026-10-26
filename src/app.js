@@ -76,11 +76,7 @@ function render() {
     tab.setAttribute('aria-pressed', String(l.id === openId))
     tab.addEventListener('click', () => {
       // The rename field names the open list, so it closes when another list opens.
-      if (nameMode === 'rename' && l.id !== openId) {
-        nameMode = null
-        nameForm.hidden = true
-        listMessage.textContent = ''
-      }
+      if (nameMode === 'rename' && l.id !== openId) hideNameField()
       save(lists, l.id)
     })
     return tab
@@ -173,11 +169,15 @@ function openNameField(mode) {
   nameInput.select()
 }
 
-function closeNameField() {
-  const trigger = nameMode === 'add' ? addListButton : renameListButton
+function hideNameField() {
   nameMode = null
   nameForm.hidden = true
   listMessage.textContent = ''
+}
+
+function closeNameField() {
+  const trigger = nameMode === 'add' ? addListButton : renameListButton
+  hideNameField()
   trigger.focus()
 }
 
@@ -226,6 +226,8 @@ deleteListButton.addEventListener('click', () => {
   const open = lists.find((l) => l.id === openId)
   if (lists.length === 1 || !window.confirm(`Delete the list "${open.name}" and all its todos?`)) return
   const next = removeList(lists, openId)
+  // A pending rename named the deleted list, so it must not rename the next one.
+  hideNameField()
   save(next, next[0].id)
   listTabs.querySelector('[aria-pressed="true"]').focus()
 })
