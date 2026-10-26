@@ -1,0 +1,42 @@
+{
+  "id": "003-items-left-counter",
+  "feature": "Show how many todos are still active below the list, as \"1 item left\" or \"N items left\", updating as todos are added, ticked, edited or deleted",
+  "branch": "factory/003-items-left-counter",
+  "worktree": "/Users/pkalliag/Dev/AI_Code_Factory-factory/003-items-left-counter",
+  "base": "example/todo-app",
+  "base_sha": "402b65f738e2f1b7154d10f4d7f00e8409637420",
+  "after": null,
+  "stage": "merged",
+  "round": 1,
+  "reviews": {
+    "security": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "code": "PASS"
+  },
+  "tokens": {
+    "spec-writer": 15153,
+    "builder r1": 24347,
+    "code r1": 12188,
+    "security r1": 12125,
+    "ui r1": 12470,
+    "ux r1": 12523,
+    "approver": 18482
+  },
+  "seconds": {
+    "spec-writer": 36,
+    "builder r1": 141,
+    "code r1": 9,
+    "security r1": 14,
+    "ui r1": 26,
+    "ux r1": 29,
+    "approver": 28
+  },
+  "built": 1,
+  "reviewed_at": 1792955092.621005,
+  "reviewed": {
+    "1": "ade5fb2"
+  },
+  "head": "ade5fb29946e0d5acbd4aa0ee2e5474d2179617c",
+  "approved_at": 1792955137.7859352
+}

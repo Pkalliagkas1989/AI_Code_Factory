@@ -1,0 +1,53 @@
+{
+  "id": "004-mark-all-done",
+  "feature": "Next to that counter, add a \"Mark all as done\" button that ticks every active todo at once; it is disabled when there are no active todos",
+  "branch": "factory/004-mark-all-done",
+  "worktree": "/Users/pkalliag/Dev/AI_Code_Factory-factory/004-mark-all-done",
+  "base": "factory/003-items-left-counter",
+  "base_sha": "ade5fb29946e0d5acbd4aa0ee2e5474d2179617c",
+  "after": "003-items-left-counter",
+  "stage": "merged",
+  "round": 2,
+  "reviews": {
+    "security": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "code": "PASS"
+  },
+  "tokens": {
+    "spec-writer": 15350,
+    "builder r1": 26419,
+    "code r1": 12894,
+    "security r1": 10758,
+    "ux r1": 14663,
+    "ui r1": 16816,
+    "builder r2": 35035,
+    "code r2": 11286,
+    "security r2": 11690,
+    "ux r2": 14285,
+    "ui r2": 15803,
+    "approver": 22914
+  },
+  "seconds": {
+    "spec-writer": 31,
+    "builder r1": 71,
+    "code r1": 11,
+    "security r1": 14,
+    "ux r1": 28,
+    "ui r1": 32,
+    "builder r2": 50,
+    "code r2": 10,
+    "security r2": 16,
+    "ux r2": 26,
+    "ui r2": 30,
+    "approver": 48
+  },
+  "built": 2,
+  "reviewed_at": 1792955400.2962172,
+  "reviewed": {
+    "1": "3f9771a",
+    "2": "1e6e1a6"
+  },
+  "head": "1e6e1a6e20564507aad243763779598603861f2a",
+  "approved_at": 1792955447.350253
+}

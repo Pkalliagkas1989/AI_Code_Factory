@@ -1,0 +1,56 @@
+{
+  "id": "005-named-lists",
+  "feature": "Let people keep several named todo lists. A list switcher above the input shows every list and which one is open; people can add a list (name required, trimmed, at most 40 characters, unique ignoring case), rename it with the same rules, and delete it after a confirmation, but never the last list. Each list keeps its own todos; the filters, the items-left counter, \"Mark all as done\" and \"Clear completed\" act on the open list only. The app reopens the last open list after a reload. Todos saved before this change move into a list called \"My todos\" without losing any.",
+  "branch": "factory/005-named-lists",
+  "worktree": "/Users/pkalliag/Dev/AI_Code_Factory-factory/005-named-lists",
+  "base": "factory/004-mark-all-done",
+  "base_sha": "1e6e1a6e20564507aad243763779598603861f2a",
+  "after": "004-mark-all-done",
+  "stage": "merged",
+  "round": 2,
+  "reviews": {
+    "security": "PASS",
+    "ux": "PASS",
+    "ui": "PASS",
+    "code": "PASS"
+  },
+  "tokens": {
+    "spec-writer": 19544,
+    "builder r1": 52320,
+    "code r1": 19254,
+    "security r1": 18791,
+    "ui r1": 15731,
+    "ux r1": 20907,
+    "approver": 29339,
+    "builder r2": 21421,
+    "code r2": 14159,
+    "security r2": 12203,
+    "ui r2": 11888,
+    "ux r2": 19270,
+    "approver r2": 35013
+  },
+  "seconds": {
+    "spec-writer": 59,
+    "builder r1": 385,
+    "code r1": 16,
+    "security r1": 18,
+    "ui r1": 40,
+    "ux r1": 63,
+    "approver": 56,
+    "builder r2": 79,
+    "code r2": 16,
+    "security r2": 20,
+    "ui r2": 24,
+    "ux r2": 196,
+    "approver r2": 83
+  },
+  "interrupted": {},
+  "built": 2,
+  "reviewed_at": 1793004804.2412941,
+  "reviewed": {
+    "1": "9501c2d",
+    "2": "b8bbaa1"
+  },
+  "head": "b8bbaa124bc5decf6bfc2ba9e88c6ca29cb567c7",
+  "approved_at": 1793005017.059681
+}
