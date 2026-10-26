@@ -24,6 +24,9 @@ Want to see it work? The
 branch is a small todo app that grows one feature at a time through
 `/factory`, with every job's spec, reviews, decision and cost kept next to it.
 
+Short on time? Watch the [20-second pitch](pitch/ai-code-factory.mp4)
+([about it](pitch/README.md)).
+
 Inspired by ZazenCodes' video
 [Build Your Own AI Software Factory with Claude Code](https://www.youtube.com/watch?v=ctoaIC4LHmI).
 All files here were written for this repo.

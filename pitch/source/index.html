@@ -1,0 +1,255 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>brag</title>
+<style>
+:root {
+  --bg: #12151b; --panel: #1b1f27; --ink: #e6e9ef; --muted: #8d94a5; --line: #2a303b;
+  --pass: #4cc47e; --pass-bg: #173326; --changes: #f08a5d; --changes-bg: #3a2219;
+  --pending: #8d94a5; --pending-bg: #252a34; --human: #f2b544; --human-bg: #3a2e14; --accent: #7c8dff;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  background: radial-gradient(1200px 700px at 50% 40%, #1a1f2b 0%, var(--bg) 70%); }
+.scene { position: absolute; inset: 0; opacity: 0; }
+.h { font-weight: 700; letter-spacing: -0.02em; text-align: center; }
+.mono { font-family: var(--mono); }
+.chip { display: inline-block; font: 600 26px var(--mono); padding: 6px 18px; border-radius: 99px; }
+.PASS { background: var(--pass-bg); color: var(--pass); }
+.CHANGES { background: var(--changes-bg); color: var(--changes); }
+.pending { background: var(--pending-bg); color: var(--pending); }
+
+/* 1 hook */
+#term { position: absolute; left: 310px; top: 430px; width: 1300px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 40px 120px rgb(0 0 0 / .5); overflow: hidden; }
+#term .bar { height: 54px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; padding: 0 22px; }
+#term .bar i { width: 16px; height: 16px; border-radius: 50%; background: var(--line); display: block; }
+#term .body { padding: 40px 44px 48px; font: 500 40px/1.4 var(--mono); white-space: pre; }
+#term .p { color: var(--accent); }
+#cursor { display: inline-block; width: 22px; height: 46px; background: var(--ink); vertical-align: -8px; margin-left: 2px; }
+#hookTitle { position: absolute; top: 200px; width: 100%; font-size: 96px; }
+#hookTitle em { font-style: normal; color: var(--accent); }
+
+/* 2 pipeline */
+#s2title { position: absolute; top: 110px; width: 100%; font-size: 84px; }
+.node { position: absolute; width: 300px; height: 120px; background: var(--panel); border: 2px solid var(--line);
+  border-radius: 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; }
+.node b { font: 700 32px var(--mono); }
+.node small { font: 500 22px var(--mono); color: var(--muted); }
+.node.rev { width: 260px; height: 84px; flex-direction: row; gap: 14px; }
+.node.rev b { font-size: 28px; }
+#wires { position: absolute; inset: 0; }
+#pulse { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 30px 10px rgb(124 141 255 / .55); }
+#loopLabel { position: absolute; font: 700 26px var(--mono); color: var(--changes); }
+
+/* 3 reviews */
+#s3title { position: absolute; top: 96px; width: 100%; font-size: 80px; }
+#roundTag { position: absolute; top: 230px; width: 100%; text-align: center; font: 600 34px var(--mono); color: var(--muted); }
+.rcard { position: absolute; top: 330px; width: 380px; height: 250px; background: var(--panel); border: 2px solid var(--line);
+  border-radius: 18px; padding: 34px; display: flex; flex-direction: column; justify-content: space-between; }
+.rcard .name { font: 700 40px var(--mono); }
+.rcard .model { font: 500 24px var(--mono); color: var(--muted); }
+#finding { position: absolute; left: 200px; top: 650px; width: 1520px; background: var(--changes-bg); border: 2px solid var(--changes);
+  border-radius: 18px; padding: 30px 40px; }
+#finding .src { font: 600 26px var(--mono); color: var(--changes); }
+#finding p { font-size: 40px; font-weight: 600; margin-top: 10px; line-height: 1.3; }
+#fixed { position: absolute; left: 200px; top: 650px; width: 1520px; background: var(--pass-bg); border: 2px solid var(--pass);
+  border-radius: 18px; padding: 30px 40px; }
+#fixed .src { font: 600 26px var(--mono); color: var(--pass); }
+#fixed p { font-size: 40px; font-weight: 600; margin-top: 10px; }
+
+/* 4 dashboard */
+#s4title { position: absolute; top: 70px; width: 100%; font-size: 72px; }
+#board { position: absolute; left: 80px; top: 230px; width: 1760px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
+.col { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; height: 470px; padding: 18px; }
+.col h2 { font: 600 20px -apple-system, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#card { position: absolute; top: 300px; width: 262px; background: var(--bg); border: 2px solid var(--line); border-radius: 12px; padding: 16px; }
+#card .id { font: 700 26px var(--mono); }
+#card .feat { color: var(--muted); font-size: 22px; margin: 8px 0 12px; line-height: 1.35; }
+#card .row { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+#card .row span.n { font: 15px var(--mono); color: var(--muted); width: 26px; }
+#card .c { font: 600 15px var(--mono); padding: 2px 8px; border-radius: 99px; }
+#card .tokens { margin-top: 12px; font: 17px var(--mono); color: var(--muted); }
+#decision { position: absolute; left: 400px; top: 300px; width: 1120px; background: var(--panel); border: 2px solid var(--line);
+  border-radius: 20px; padding: 44px 52px; box-shadow: 0 40px 140px rgb(0 0 0 / .7); }
+#decision .rec { font: 800 54px var(--mono); color: var(--pass); }
+#decision p { font-size: 32px; line-height: 1.4; margin: 22px 0 28px; color: var(--ink); }
+#decision pre { background: var(--bg); border-radius: 12px; padding: 22px 26px; font: 500 27px/1.5 var(--mono); color: var(--ink); }
+#decision pre .k { color: var(--accent); }
+
+/* 5 outro */
+#o1 { position: absolute; top: 380px; width: 100%; font-size: 110px; }
+#o2 { position: absolute; top: 540px; width: 100%; font-size: 150px; color: var(--human); }
+#end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; }
+#end .logo { font-size: 130px; font-weight: 800; letter-spacing: -0.03em; }
+#end .cmd { font: 600 52px var(--mono); color: var(--accent); background: var(--panel); border: 1px solid var(--line); padding: 18px 40px; border-radius: 16px; }
+#end .url { font: 500 36px var(--mono); color: var(--muted); }
+</style></head>
+<body><div id="stage">
+
+<section class="scene" id="s1">
+  <div id="hookTitle" class="h">One command. <em>A whole dev team.</em></div>
+  <div id="term"><div class="bar"><i></i><i></i><i></i></div>
+    <div class="body"><span class="p">❯ </span><span id="typed"></span><span id="cursor"></span></div></div>
+</section>
+
+<section class="scene" id="s2">
+  <div id="s2title" class="h">Seven agents. One loop.</div>
+  <svg id="wires" width="1920" height="1080"></svg>
+  <div class="node" id="n-spec" style="left:90px;top:540px"><b>spec-writer</b><small>opus → spec.md</small></div>
+  <div class="node" id="n-build" style="left:500px;top:540px"><b>builder</b><small>opus → commits</small></div>
+  <div class="node rev" id="n-sec" style="left:940px;top:386px"><b>security</b></div>
+  <div class="node rev" id="n-ux" style="left:940px;top:496px"><b>ux</b></div>
+  <div class="node rev" id="n-ui" style="left:940px;top:606px"><b>ui</b></div>
+  <div class="node rev" id="n-code" style="left:940px;top:716px"><b>code</b></div>
+  <div class="node" id="n-appr" style="left:1440px;top:540px"><b>approver</b><small>opus → decision.md</small></div>
+  <div id="loopLabel">CHANGES ↺</div>
+  <div id="pulse"></div>
+</section>
+
+<section class="scene" id="s3">
+  <div id="s3title" class="h">Caught a bug the tests missed.</div>
+  <div id="roundTag">job 002 · round 1</div>
+  <div class="rcard" style="left:150px"><div><div class="name">security</div><div class="model">opus</div></div><div><span class="chip" id="v-sec">PASS</span></div></div>
+  <div class="rcard" style="left:560px"><div><div class="name">ux</div><div class="model">sonnet</div></div><div><span class="chip" id="v-ux">PASS</span></div></div>
+  <div class="rcard" style="left:970px"><div><div class="name">ui</div><div class="model">sonnet</div></div><div><span class="chip" id="v-ui">PASS</span></div></div>
+  <div class="rcard" id="rc-code" style="left:1380px"><div><div class="name">code</div><div class="model">sonnet</div></div><div><span class="chip" id="v-code">CHANGES</span></div></div>
+  <div id="finding"><div class="src">review-code.md · src/app.js:43</div><p>Click two todos quickly and the first tick is silently lost.</p></div>
+  <div id="fixed"><div class="src">round 2 · builder resumed with the feedback</div><p>Fixed. All four reviewers pass.</p></div>
+</section>
+
+<section class="scene" id="s4">
+  <div id="s4title" class="h">Every job on one board. Every token counted.</div>
+  <div id="board">
+    <div class="col"><h2>spec</h2></div><div class="col"><h2>build</h2></div><div class="col"><h2>review</h2></div>
+    <div class="col"><h2>approve</h2></div><div class="col"><h2>ready to merge</h2></div><div class="col"><h2>merged</h2></div>
+  </div>
+  <div id="card">
+    <div class="id">002-edit-todo</div>
+    <div class="feat">Let people edit a todo's text by double-clicking it.</div>
+    <div class="row"><span class="n">r1</span><span class="c PASS">sec</span><span class="c PASS">ux</span><span class="c PASS">ui</span><span class="c CHANGES">code</span></div>
+    <div class="row" id="r2row"><span class="n">r2</span><span class="c PASS">sec</span><span class="c PASS">ux</span><span class="c PASS">ui</span><span class="c PASS">code</span></div>
+    <div class="tokens">220k tokens · 12 agent runs · 9m 36s</div>
+  </div>
+  <div id="decision">
+    <div class="rec">RECOMMEND: MERGE</div>
+    <p>People can now double-click a todo's text to change it. All four reviewers passed it in round 2, and the tests pass.</p>
+    <pre><span class="k">git merge</span> --no-ff factory/002-edit-todo \
+  -m "feat(ui): edit a todo's text by double-clicking it"</pre>
+  </div>
+</section>
+
+<section class="scene" id="s5">
+  <div id="o1" class="h">The factory never merges.</div>
+  <div id="o2" class="h">You do.</div>
+  <div id="end">
+    <div class="logo">AI Code Factory</div>
+    <div class="cmd">/factory &lt;feature&gt;</div>
+    <div class="url">github.com/Pkalliagkas1989/AI_Code_Factory</div>
+  </div>
+</section>
+
+</div>
+<script>
+const $ = (id) => document.getElementById(id)
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+const p = (t, a, b) => clamp((t - a) / (b - a))
+const eo = (x) => 1 - Math.pow(1 - x, 3)               // ease out cubic
+const eio = (x) => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+const back = (x) => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2) }
+const lerp = (a, b, x) => a + (b - a) * x
+function show(el, o, dy = 0, s = 1) { el.style.opacity = o; el.style.transform = `translateY(${dy}px) scale(${s})` }
+function pop(el, t, at, dur = .35) { const x = p(t, at, at + dur); show(el, clamp(x * 2), (1 - eo(x)) * 30, lerp(.85, 1, back(x))) }
+// scene visibility: fade in over 0.25s at start, fade out over 0.25s before end (dip through background)
+function scene(el, t, a, b) { const o = Math.min(p(t, a, a + .25), 1 - p(t, b - .25, b)); el.style.opacity = o; return t >= a - .01 && t <= b + .01 }
+
+const CMD = '/factory let people edit a todo by double-clicking it'
+const POS = { spec: [240, 600], build: [650, 600], sec: [1070, 428], ux: [1070, 538], ui: [1070, 648], code: [1070, 758], appr: [1590, 600] }
+function buildWires() {
+  const s = $('wires'); let h = ''
+  const line = (id, a, b) => { h += `<path id="${id}" d="M${a[0]} ${a[1]} C ${(a[0] + b[0]) / 2} ${a[1]}, ${(a[0] + b[0]) / 2} ${b[1]}, ${b[0]} ${b[1]}" stroke="#2a303b" stroke-width="4" fill="none"/>` }
+  line('w0', [390, 600], [500, 600])
+  for (const k of ['sec', 'ux', 'ui', 'code']) { line('wa-' + k, [800, 600], [940, POS[k][1]]); line('wb-' + k, [1200, POS[k][1]], [1440, 600]) }
+  h += `<path id="wloop" d="M1070 800 C 1070 930, 650 930, 650 662" stroke="#f08a5d" stroke-width="4" stroke-dasharray="14 12" fill="none"/>`
+  s.innerHTML = h
+  for (const p of s.querySelectorAll('path')) { const L = p.getTotalLength(); p.dataset.len = L }
+}
+function draw(id, x) { const el = $(id); const L = +el.dataset.len; if (el.getAttribute('stroke-dasharray') && id === 'wloop') { el.style.opacity = x > 0 ? 1 : 0; el.style.clipPath = `inset(0 0 0 0)`; el.style.strokeDashoffset = 0; el.style.opacity = eo(x) } else { el.style.strokeDasharray = L; el.style.strokeDashoffset = L * (1 - eo(x)) } }
+
+function render(t) {
+  // 1 hook 0–3
+  if (scene($('s1'), t, 0, 3)) {
+    const n = Math.round(CMD.length * p(t, .15, 1.55))
+    $('typed').textContent = CMD.slice(0, n)
+    $('cursor').style.opacity = n < CMD.length ? 1 : (Math.floor(t * 4) % 2 ? 0 : 1)
+    const x = p(t, 1.0, 1.45); show($('hookTitle'), x, (1 - eo(x)) * 40)
+    $('term').style.transform = `translateY(${lerp(30, 0, eo(p(t, 0, .4)))}px) scale(${lerp(1, .96, eio(p(t, 1, 3)))})`
+  }
+  // 2 pipeline 3–7
+  if (scene($('s2'), t, 3, 7)) {
+    pop($('s2title'), t, 3.05)
+    const at = { spec: 3.25, build: 3.5, sec: 4.0, ux: 4.06, ui: 4.12, code: 4.18, appr: 4.5 }
+    for (const k in at) pop($('n-' + k), t, at[k])
+    draw('w0', p(t, 3.5, 3.8))
+    for (const k of ['sec', 'ux', 'ui', 'code']) { draw('wa-' + k, p(t, 3.85, 4.2)); draw('wb-' + k, p(t, 4.35, 4.7)) }
+    // pulse: spec → build → reviewers (fan) → approver, 4.75–6.5; loop arrow appears 5.5
+    const pl = $('pulse'); let pos = null
+    const tp = (a, b, x) => [lerp(a[0], b[0], eio(x)), lerp(a[1], b[1], eio(x))]
+    if (t >= 4.75 && t < 5.25) pos = tp(POS.spec, POS.build, p(t, 4.75, 5.25))
+    else if (t >= 5.25 && t < 5.75) pos = tp(POS.build, POS.code, p(t, 5.25, 5.75))
+    else if (t >= 5.75 && t < 6.25) pos = tp(POS.code, POS.appr, p(t, 5.75, 6.25))
+    pl.style.opacity = pos ? 1 : 0
+    if (pos) { pl.style.left = pos[0] + 'px'; pl.style.top = pos[1] + 'px' }
+    const lit = (k, a, b) => { const on = t >= a && t < b + .6; $('n-' + k).style.borderColor = on ? 'var(--accent)' : 'var(--line)' }
+    lit('spec', 4.75, 4.9); lit('build', 5.2, 5.4)
+    for (const k of ['sec', 'ux', 'ui']) { const on = t >= 5.7; $('n-' + k).style.borderColor = on ? 'var(--pass)' : 'var(--line)' }
+    $('n-code').style.borderColor = t >= 5.7 ? 'var(--changes)' : 'var(--line)'
+    lit('appr', 6.2, 7)
+    const lx = p(t, 5.8, 6.2); $('wloop').style.opacity = eo(lx)
+    const ll = $('loopLabel'); ll.style.left = '770px'; ll.style.top = '890px'; show(ll, lx, (1 - eo(lx)) * 16)
+  }
+  // 3 reviews 7–11
+  if (scene($('s3'), t, 7, 11)) {
+    pop($('s3title'), t, 7.05)
+    const r2 = t >= 9.0
+    $('roundTag').textContent = r2 ? 'job 002 · round 2' : 'job 002 · round 1'
+    show($('roundTag'), p(t, 7.2, 7.5))
+    document.querySelectorAll('#s3 .rcard').forEach((c, i) => pop(c, t, 7.25 + i * .08))
+    for (const k of ['sec', 'ux', 'ui']) $('v-' + k).className = 'chip PASS'
+    const code = $('v-code'); code.className = 'chip ' + (r2 ? 'PASS' : 'CHANGES'); code.textContent = r2 ? 'PASS' : 'CHANGES'
+    $('rc-code').style.borderColor = r2 ? 'var(--pass)' : 'var(--changes)'
+    const flip = p(t, 9.0, 9.3); code.style.transform = `scale(${r2 ? lerp(1.25, 1, eo(flip)) : 1})`
+    const f = p(t, 7.6, 7.95); const fo = 1 - p(t, 8.8, 9.0); show($('finding'), Math.min(clamp(f * 2), fo), (1 - eo(f)) * 30)
+    const g = p(t, 9.0, 9.35); show($('fixed'), clamp(g * 2), (1 - eo(g)) * 30)
+  }
+  // 4 dashboard 11–15
+  if (scene($('s4'), t, 11, 15)) {
+    pop($('s4title'), t, 11.05)
+    const colX = (i) => 80 + 18 + i * ((1760 - 5 * 18) / 6 + 18) - 0
+    // card hops a column per half beat: spec 11.3, build 11.5, review 11.75, approve 12.0, ready 12.25
+    const hops = [11.3, 11.55, 11.8, 12.05, 12.3]
+    let i = 0, x = 0; for (let k = 1; k < hops.length; k++) if (t >= hops[k]) { i = k }
+    const prev = Math.max(0, i - 1), mv = i === 0 ? 1 : p(t, hops[i], hops[i] + .22)
+    x = lerp(colX(prev), colX(i), eio(mv))
+    const card = $('card'); card.style.left = (x - 4) + 'px'
+    card.style.opacity = clamp(p(t, 11.2, 11.4) * 1)
+    card.style.borderColor = i === 4 ? 'var(--pass)' : 'var(--line)'
+    $('r2row').style.opacity = t >= 11.8 ? 1 : 0
+    const d = p(t, 12.85, 13.25); show($('decision'), clamp(d * 2), (1 - eo(d)) * 60, lerp(.96, 1, eo(d)))
+  }
+  // 5 outro 15–20
+  if (scene($('s5'), t, 15, 20.5)) {
+    const out = 1 - p(t, 16.75, 17.0)
+    const a = p(t, 15.05, 15.4); show($('o1'), Math.min(clamp(a * 2), out), (1 - eo(a)) * 30)
+    const b = p(t, 16.0, 16.3); show($('o2'), Math.min(clamp(b * 2), out), 0, lerp(1.25, 1, back(b)))
+    const e = p(t, 17.0, 17.4); show($('end'), clamp(e * 2), (1 - eo(e)) * 30)
+  }
+}
+buildWires()
+window.render = render
+window.ready = document.fonts.ready.then(() => true)
+render(+(new URLSearchParams(location.search).get('t') || 0))
+</script>
+</body></html>

@@ -6,3 +6,8 @@
 
 # Python bytecode from the factory script tests
 __pycache__/
+
+# Working files from making the pitch video (frames, browser profile, raw audio)
+brag-output/
+pitch/source/chrome-profile/
+pitch/source/frames/

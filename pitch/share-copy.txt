@@ -1,0 +1,5 @@
+Type /factory and a spec-writer, a builder, four reviewers and an approver ship your feature on its own branch. On the second job, the code reviewer caught a bug the tests missed. The factory never merges. You do.
+
+github.com/Pkalliagkas1989/AI_Code_Factory
+
+Music: original synthesized track made for this video.
