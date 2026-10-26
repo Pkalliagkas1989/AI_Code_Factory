@@ -49,3 +49,12 @@ footer #count { margin: 0; }
 .filter:hover, .quiet:hover:enabled { color: var(--text); }
 .filter[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .quiet:disabled { opacity: 0.5; cursor: default; }
+
+.lists { margin-bottom: calc(var(--space) * 2); }
+.list-tabs, .list-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space) / 2); }
+.list-tab { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.list-actions { margin-top: var(--space); }
+#list-name { margin-top: var(--space); }
+#list-name[hidden] { display: none; }
+#list-name input { min-width: 0; }
+#list-message { margin: var(--space) 0 0; color: var(--muted); font-size: 14px; }

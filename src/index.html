@@ -9,6 +9,21 @@
 <body>
   <main>
     <h1>Todos</h1>
+    <section class="lists">
+      <div class="list-tabs" role="group" aria-label="Lists"></div>
+      <div class="list-actions">
+        <button type="button" id="add-list" class="quiet">New list</button>
+        <button type="button" id="rename-list" class="quiet">Rename list</button>
+        <button type="button" id="delete-list" class="quiet">Delete list</button>
+      </div>
+      <form id="list-name" hidden>
+        <label for="list-name-text" class="visually-hidden">List name</label>
+        <input id="list-name-text" maxlength="40" autocomplete="off">
+        <button type="submit">Save</button>
+        <button type="button" id="list-name-cancel" class="quiet">Cancel</button>
+      </form>
+      <p id="list-message" aria-live="polite"></p>
+    </section>
     <form id="new-todo">
       <label for="todo-text" class="visually-hidden">New todo</label>
       <input id="todo-text" placeholder="What needs doing?" autocomplete="off">

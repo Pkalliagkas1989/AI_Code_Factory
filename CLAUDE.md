@@ -14,8 +14,8 @@ One page: add todos, tick them off, delete them. Data stays in the browser
 ## Layout
 
 - `src/index.html`: the page.
-- `src/app.js`: connects the page to the logic, renders the list, saves to localStorage.
-- `src/todos.js`: pure functions for the todo list. Put all list logic here so it can be unit-tested.
+- `src/app.js`: connects the page to the logic, renders the list switcher and the open list, saves the named lists and the open list id to localStorage under `todoLists` (the old `todos` key is only read, to migrate it into a `My todos` list).
+- `src/todos.js`: pure functions for the todos and the named lists (name rules, add/rename/remove, initial state from storage). Put all list logic here so it can be unit-tested.
 - `src/styles.css`: all styles. Colours and spacing come from the tokens on `:root`.
 - `test/`: unit tests for `src/todos.js`, using Node's built-in test runner.
 
