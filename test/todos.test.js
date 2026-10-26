@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, completeAll, editTodo } from '../src/todos.js'
+import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, completeAll, editTodo, listNameError, addList, renameList, removeList, setListTodos, initialState } from '../src/todos.js'
 
 test('addTodo trims text and gives the next id', () => {
   const todos = addTodo(addTodo([], ' Buy milk '), 'Walk dog')
@@ -138,4 +138,98 @@ test('completeAll does not mutate its input', () => {
 
 test('completeAll of an empty list is an empty array', () => {
   assert.deepEqual(completeAll([]), [])
+})
+
+const twoLists = () => addList(addList([], 'My todos'), 'Work')
+
+test('listNameError rejects empty and spaces-only names', () => {
+  assert.equal(listNameError([], ''), 'empty')
+  assert.equal(listNameError([], '   '), 'empty')
+})
+
+test('listNameError allows 40 characters after trimming and rejects 41', () => {
+  assert.equal(listNameError([], ` ${'a'.repeat(40)} `), null)
+  assert.equal(listNameError([], 'a'.repeat(41)), 'too-long')
+})
+
+test('listNameError rejects another list\'s name in any case', () => {
+  assert.equal(listNameError(twoLists(), ' work '), 'duplicate')
+  assert.equal(listNameError(twoLists(), 'MY TODOS', 2), 'duplicate')
+})
+
+test('listNameError lets a list keep its own name in another case', () => {
+  assert.equal(listNameError(twoLists(), 'WORK', 2), null)
+})
+
+test('addList appends a trimmed list with the next id and no todos', () => {
+  assert.deepEqual(addList(addList([], 'My todos'), '  Work  '), [
+    { id: 1, name: 'My todos', todos: [] },
+    { id: 2, name: 'Work', todos: [] },
+  ])
+})
+
+test('addList returns the same lists for an invalid name', () => {
+  const lists = twoLists()
+  assert.equal(addList(lists, 'work'), lists)
+  assert.equal(addList(lists, ''), lists)
+  assert.equal(addList(lists, 'a'.repeat(41)), lists)
+})
+
+test('renameList changes only the name and refuses invalid names', () => {
+  const lists = setListTodos(twoLists(), 2, addTodo([], 'x'))
+  const renamed = renameList(lists, 2, ' WORK ')
+  assert.deepEqual(renamed[1], { id: 2, name: 'WORK', todos: lists[1].todos })
+  assert.equal(renameList(lists, 2, 'my todos'), lists)
+  assert.equal(renameList(lists, 2, ' '), lists)
+})
+
+test('removeList removes a list but never the last one', () => {
+  assert.deepEqual(removeList(twoLists(), 2).map((l) => l.id), [1])
+  const one = addList([], 'Only')
+  assert.equal(removeList(one, 1), one)
+})
+
+test('setListTodos replaces the todos of one list only', () => {
+  const lists = setListTodos(twoLists(), 2, addTodo([], 'x'))
+  assert.deepEqual(lists[0].todos, [])
+  assert.deepEqual(lists[1].todos, [{ id: 1, text: 'x', done: false }])
+})
+
+test('list functions do not mutate their input', () => {
+  const before = setListTodos(twoLists(), 1, addTodo([], 'a'))
+  const snapshot = structuredClone(before)
+  addList(before, 'New')
+  renameList(before, 1, 'Renamed')
+  removeList(before, 1)
+  setListTodos(before, 1, [])
+  listNameError(before, 'x', 1)
+  assert.deepEqual(before, snapshot)
+})
+
+test('initialState moves old todos unchanged into My todos', () => {
+  const old = [{ id: 1, text: 'a', done: false }, { id: 2, text: 'b', done: true }]
+  assert.deepEqual(initialState(null, JSON.stringify(old)), {
+    lists: [{ id: 1, name: 'My todos', todos: old }],
+    openId: 1,
+  })
+})
+
+test('initialState starts with an empty My todos on missing or bad data', () => {
+  const empty = { lists: [{ id: 1, name: 'My todos', todos: [] }], openId: 1 }
+  assert.deepEqual(initialState(null, null), empty)
+  assert.deepEqual(initialState('{bad', '[oops'), empty)
+  assert.deepEqual(initialState('{"lists":[]}', '{"not":"a list"}'), empty)
+  assert.deepEqual(initialState('[1,2]', '[]'), empty)
+})
+
+test('initialState prefers saved lists and opens the saved list', () => {
+  const lists = setListTodos(twoLists(), 2, addTodo([], 'x'))
+  const raw = JSON.stringify({ lists, openId: 2 })
+  assert.deepEqual(initialState(raw, '[{"id":9,"text":"old","done":false}]'), { lists, openId: 2 })
+})
+
+test('initialState opens the first list when the saved id is gone or missing', () => {
+  const lists = twoLists()
+  assert.equal(initialState(JSON.stringify({ lists, openId: 7 }), null).openId, 1)
+  assert.equal(initialState(JSON.stringify({ lists }), null).openId, 1)
 })
