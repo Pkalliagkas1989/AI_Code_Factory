@@ -1,5 +1,5 @@
 // Wires the todo logic to the page and keeps the list in localStorage.
-import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, editTodo } from './todos.js'
+import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, completeAll, editTodo } from './todos.js'
 
 const KEY = 'todos'
 const form = document.querySelector('#new-todo')
@@ -8,6 +8,7 @@ const list = document.querySelector('#list')
 const count = document.querySelector('#count')
 const filterButtons = document.querySelectorAll('.filter')
 const clearButton = document.querySelector('#clear-completed')
+const completeAllButton = document.querySelector('#complete-all')
 
 let todos = load()
 let filter = 'all'
@@ -72,6 +73,7 @@ function render() {
   }))
   count.textContent = itemsLeftLabel(todos)
   clearButton.disabled = remaining(todos) === todos.length
+  completeAllButton.disabled = remaining(todos) === 0
   filterButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === filter)))
 }
 
@@ -116,5 +118,6 @@ filterButtons.forEach((b) => b.addEventListener('click', () => {
 }))
 
 clearButton.addEventListener('click', () => update(clearCompleted(todos)))
+completeAllButton.addEventListener('click', () => update(completeAll(todos)))
 
 render()

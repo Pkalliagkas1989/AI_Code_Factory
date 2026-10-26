@@ -16,7 +16,10 @@
     </form>
     <ul id="list"></ul>
     <footer>
-      <p id="count" aria-live="polite"></p>
+      <div class="status">
+        <p id="count" aria-live="polite"></p>
+        <button type="button" id="complete-all" class="quiet">Mark all as done</button>
+      </div>
       <div class="filters" role="group" aria-label="Show">
         <button type="button" class="filter" data-filter="all" aria-pressed="true">All</button>
         <button type="button" class="filter" data-filter="active" aria-pressed="false">Active</button>

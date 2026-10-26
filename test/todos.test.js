@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, editTodo } from '../src/todos.js'
+import { addTodo, toggleTodo, removeTodo, remaining, itemsLeftLabel, filterTodos, clearCompleted, completeAll, editTodo } from '../src/todos.js'
 
 test('addTodo trims text and gives the next id', () => {
   const todos = addTodo(addTodo([], ' Buy milk '), 'Walk dog')
@@ -117,4 +117,25 @@ test('editTodo does not mutate its input', () => {
   editTodo(before, 2, 'changed')
   editTodo(before, 1, '')
   assert.deepEqual(before, copy)
+})
+
+test('completeAll marks every todo done and keeps ids and texts', () => {
+  const todos = toggleTodo(addTodo(addTodo(addTodo([], 'a'), 'b'), 'c'), 2)
+  assert.deepEqual(completeAll(todos), [
+    { id: 1, text: 'a', done: true },
+    { id: 2, text: 'b', done: true },
+    { id: 3, text: 'c', done: true },
+  ])
+})
+
+test('completeAll does not mutate its input', () => {
+  const before = addTodo(addTodo([], 'a'), 'b')
+  const snapshot = structuredClone(before)
+  const after = completeAll(before)
+  assert.notEqual(after, before)
+  assert.deepEqual(before, snapshot)
+})
+
+test('completeAll of an empty list is an empty array', () => {
+  assert.deepEqual(completeAll([]), [])
 })
