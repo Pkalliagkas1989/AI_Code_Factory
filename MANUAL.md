@@ -41,12 +41,14 @@ Setup takes 6 steps and is done once per project. A developer usually does it; a
 
 ### The 6 steps
 
-1. **Copy the factory files.** Copy the `.claude/` folder and the `factory/` folder from this repository into the root folder of your project.
+1. **Copy the factory files.** Copy `.claude/` and `factory/` into the project root. For marketing, also copy `marketing/`, excluding private business records from other projects.
 2. **Hide the job files from git.** Add these two lines to the project's `.gitignore` file:
 
    ```
    /factory/jobs/*
    !/factory/jobs/.gitkeep
+   /marketing/businesses/*
+   !/marketing/businesses/.gitkeep
    ```
 3. **Describe your project.** Copy `templates/CLAUDE.md` to the project root (or merge it into an existing `CLAUDE.md`) and fill in every section: stack, folder layout, setup commands, dev server command, test commands and conventions. **This file is the only place the agents learn how your project works.** Vague answers here lead to weaker results.
 4. **Configure the factory.** Edit `factory/config.md` (see the table below).
@@ -275,3 +277,50 @@ Click a card to read its files (spec, build report, reviews, decision). The firs
 **The builder said BLOCKED but changed nothing. Why did it carry on?** A block with nothing committed is usually a glitch, such as a file read that came back empty. The factory sends the builder back once by itself. If it is blocked again, the job comes to you.
 
 **Where do I learn more?** Read `README.md` in the repository, and the agent instructions in `.claude/agents/`.
+
+## Marketing Consultant
+
+Run `/marketing <business-id> <task>` in Claude Code. Give each product its own
+lowercase kebab-case ID. Use `ai-code-factory` to market the factory itself.
+The consultant reads that business's brief and results, produces usable draft
+material, explains its evidence and proposes a measurable next step. Missing
+customer data stays unknown; no real campaign results are bundled.
+
+Private records live under `marketing/businesses/<id>/` and are ignored by git.
+See [the marketing guide](marketing/README.md) for templates, examples, research
+and validation commands. When installing elsewhere, copy the ignore rules too.
+
+To consult marketing on relevant factory jobs, fill in the optional config key:
+
+```text
+marketing_business: ai-code-factory
+```
+
+Leave it empty to disable consultation. The orchestrator reads it directly,
+consults `marketing-consultant` before the spec for offers, landing pages,
+onboarding, conversion or public copy, and passes job `marketing.md` to the
+spec writer, builder and approver. Other jobs skip it. No new stage is added.
+A missing brief produces provisional advice rather than invented evidence.
+
+For a separate marketing review gate, adapt the top of config.md to the project:
+
+```text
+reviewers: security, ux, ui, code, marketing
+always: security, code
+paths.marketing: src/landing/, src/onboarding/, content/, marketing/
+```
+
+Use real path prefixes; these are examples, not wildcard patterns. Without a
+`paths.marketing` line, marketing review always runs. Its PASS/CHANGES verdict
+and later rounds use the existing pipeline. Consultation does not count as
+review. Security/code and the human merge decision remain required.
+
+The [ten-principle research guide](.claude/skills/marketing/references/research.md)
+links to [publication metadata and limitations](.claude/skills/marketing/references/bibliography.md).
+The [analysis helper](.claude/skills/marketing/references/measurement.md) accepts
+local binary-outcome counts and reports rates/uncertainty, not a campaign winner.
+Publishing, contact, spend, new pricing and guarantees remain human decisions.
+Avoid placing private customer evidence into reports exposed by the dashboard.
+
+Technical choices are documented against the official
+[Claude Code, Git and Python references](.claude/skills/marketing/references/implementation.md).

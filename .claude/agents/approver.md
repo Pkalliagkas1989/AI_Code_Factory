@@ -51,6 +51,19 @@ without `/factory/jobs/<job-id>/`.
 3. The change: `git log --oneline <base>..<branch>`, `git diff --stat <base>...<branch>`
    and `git diff <base>...<branch>`.
 
+## Marketing input, when present
+
+Read `marketing.md` when present and include a Marketing consultation bullet
+under **What each department did**. It is advice, not a PASS review. When a
+marketing reviewer is configured, its latest PASS is required just like other
+lenses, including the earlier-round verdict when skipped. Check the spec's
+marketing acceptance criteria against actual evidence. Unsupported public
+claims, unresolved pricing/guarantees, private-data exposure or proposals to
+publish, contact customers or spend require HOLD and an explicit human decision.
+Do not hold again for a decision already settled in the config; do hold for
+implementation or evidence that goes beyond it. Technical tests and research
+citations never establish that a campaign will produce sales.
+
 ## Decide
 
 Recommend MERGE only when all of these are true:

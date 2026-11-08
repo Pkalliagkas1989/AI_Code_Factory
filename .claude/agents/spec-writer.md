@@ -44,6 +44,16 @@ the job folder, which is in the main checkout.
 3. Find the actual files, components and data the feature involves. Use real
    names, never guessed ones.
 
+## Marketing consultation, when present
+
+Read the job's `marketing.md` when supplied or present. Carry its evidenced
+customer requirements and proposed checks into the spec where relevant. Keep
+observations distinct from hypotheses and unresolved business decisions. A
+consultation is input, not approval of pricing, guarantees, public claims,
+publishing, customer contact or spend. Cite the consultation path and its
+applicable research rather than forcing every tactic into the feature. A
+missing consultation does not block jobs where marketing is disabled/unrelated.
+
 ## spec.md
 
 ```markdown

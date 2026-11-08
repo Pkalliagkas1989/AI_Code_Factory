@@ -1,7 +1,7 @@
 # AI Code Factory
 
-A software factory for [Claude Code](https://claude.com/claude-code): one skill,
-seven subagents and a handful of markdown files. Type `/factory <feature>` and a
+A software factory for [Claude Code](https://claude.com/claude-code): a factory skill,
+a set of subagents and a handful of markdown files. Type `/factory <feature>` and a
 team of agents writes a spec, builds it on its own git branch, and reviews it
 from four angles. Then the approver explains each department's work in plain
 words and hands you the exact commands to merge it. **You always do the merge.**
@@ -39,6 +39,7 @@ All files here were written for this repo.
     SKILL.md                  orchestrator: runs the loop
     scripts/factory.py        job ids, worktrees, reviewer choice, job.json updates
     references/               next/done/rework steps, job.json and selection rules
+  skills/marketing/           standalone evidence-led Marketing Consultant
   agents/
     spec-writer.md            opus     → spec.md
     builder.md                opus     → code commits + build.md
@@ -48,12 +49,15 @@ All files here were written for this repo.
     reviewer-code.md          sonnet   → round-N/review-code.md
     reviewer-api.md           sonnet   → round-N/review-api.md   (backends)
     reviewer-data.md          sonnet   → round-N/review-data.md  (backends)
+    marketing-consultant.md   sonnet   → optional pre-spec marketing.md
+    reviewer-marketing.md     sonnet   → optional review-marketing.md
     approver.md               opus     → decision.md (report + merge commands)
 factory/
   config.md                   base branch, reviewers, environment notes
   backlog.md                  feature queue for /factory next
   dashboard.html              live board of all jobs
   jobs/                       runtime state, one folder per job (gitignored)
+marketing/                    private per-business briefs and results (opt-in)
 templates/
   CLAUDE.md                   fill-in template for your project
 ```
@@ -119,13 +123,36 @@ less:
 /factory rework <job-id> <note>  send a waiting job back to the builder with feedback
 ```
 
+## Marketing Consultant
+
+`/marketing <business-id> <task>` produces strategy, usable campaign drafts,
+experiments and analysis for AI Code Factory itself or a product. Each business
+has its own brief and results history; private records are gitignored. Outputs
+are drafts/recommendations, with no automatic publishing, customer contact or
+spend. Business results require real testing; research does not guarantee sales.
+
+The [marketing guide](marketing/README.md) covers setup, optional factory
+consultation and review. The [research base](.claude/skills/marketing/references/research.md)
+qualifies ten principles with a [primary-source bibliography](.claude/skills/marketing/references/bibliography.md),
+and the [measurement guide](.claude/skills/marketing/references/measurement.md)
+documents the local count-analysis tool and its limits.
+
+```text
+/marketing ai-code-factory draft a developer launch campaign
+/marketing inventory-app plan customer discovery before launch
+/marketing inventory-app analyze our latest pilot results
+```
+
 ## Adding it to a project
 
-1. Copy `.claude/` and `factory/` into the project's root.
+1. Copy `.claude/` and `factory/` into the project's root. For marketing,
+   also copy `marketing/` (exclude private `businesses/` records from other projects).
 2. Add these lines to the project's `.gitignore`:
    ```
    /factory/jobs/*
    !/factory/jobs/.gitkeep
+   /marketing/businesses/*
+   !/marketing/businesses/.gitkeep
    ```
 3. Copy `templates/CLAUDE.md` to the project root (or merge it into the existing
    one) and fill it in. Agents learn the setup, dev server, tests and

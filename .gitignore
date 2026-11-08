@@ -11,3 +11,7 @@ __pycache__/
 brag-output/
 pitch/source/chrome-profile/
 pitch/source/frames/
+
+# Private marketing briefs, campaign drafts, customer evidence and results
+/marketing/businesses/*
+!/marketing/businesses/.gitkeep

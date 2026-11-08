@@ -86,7 +86,9 @@ Only for a job in `ready` or `needs-human`.
 1. Save the note verbatim as `rework-<k>.md` in the job folder (next unused `k`).
 2. Run `F set <job-id> stage=build`, then `F info <job-id>` for the prompt prefix
    and the builder port.
-3. Spawn a fresh `builder` named `builder-<job-id>` with
+3. Apply **Optional marketing consultation** in SKILL.md: refresh advice first
+   if the note changes audience, offer, business or claims, and pass its path.
+   Then spawn a fresh `builder` named `builder-<job-id>` with
    `<prompt_prefix> Rework: read rework-<k>.md and address it, then update build.md for round N+1. Port: <builder_port>.`
    where `N` is the job's last round. The resume counter starts over.
 4. Carry on from **Check the build** in `SKILL.md`.

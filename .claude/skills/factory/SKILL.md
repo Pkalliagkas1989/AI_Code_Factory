@@ -65,6 +65,40 @@ then the human runs the merge commands and /factory done <job-id> ─► merged
 `MAX_RESUMES = 2`: after round 1 the builder may be sent back at most twice, so a
 job has at most three review rounds.
 
+## Optional marketing consultation
+
+Read `marketing_business` from the top of `factory/config.md` directly (the
+helper intentionally does not parse it). Empty or absent means disabled.
+When set, validate it is one lowercase kebab-case directory name. Use only
+`<main checkout>/marketing/businesses/<id>/brief.md` and relevant `results.md`
+entries; these private files are not copied into git worktrees.
+
+For requests involving positioning, offers, public marketing copy, landing
+pages, onboarding or conversion, after worktree setup and **before spec-writer**,
+spawn `marketing-consultant` with `<paths>`, the feature verbatim, business ID,
+those absolute business paths and output `<job folder>/marketing.md`. Missing
+briefs produce provisional advice and explicit unknowns. For unrelated jobs,
+skip consultation and say why. Consultation grants no permission to send,
+publish or spend. Record its reported usage as `marketing-consultant` with
+`F set`, without guessed costs.
+
+Confirm the file exists and matches this job's business and feature; if missing
+or mismatched, stop and report the issue. Pass its absolute path to spec-writer,
+builder and approver. On resume before a spec exists, reuse a matching completed
+consultation; otherwise finish it before spec-writer. No new stage or job.json
+field is needed. Once a spec exists, follow normal resume rather than restarting
+consultation. On rework, pass existing marketing.md to the builder; if the note
+changes audience, offer, business or claims, refresh consultation first and ask
+the builder to flag conflicts with the original spec for the human. Do not
+silently change a spec or settled business decision.
+
+`reviewer-marketing` is a separate, optional review lens: append `marketing` to
+`reviewers`, and set `paths.marketing` to actual project prefixes. Without a
+paths line it always runs, just like any conditional lens. Keep security and
+code in `always`. Use the existing verdict/rework/approval loop; consultation
+never substitutes for review. The dashboard shows the configured marketing chip
+and review file through its existing generic lens support.
+
 ## /factory FEATURE
 
 1. **Read the config** `factory/config.md`, then pick a 2–4 word kebab-case slug.
@@ -75,10 +109,13 @@ job has at most three review rounds.
 3. **Set up the worktree.** Inside the worktree, run the fresh-checkout setup
    from the project's `CLAUDE.md` (or `AGENTS.md`), then the config's
    **Setup for a new worktree**. If a step fails, stop and tell the user.
-4. **Spec.** Spawn `spec-writer` with `<paths> Feature: <feature, verbatim>`.
+4. **Marketing, when configured.** Follow **Optional marketing consultation**
+   above. Then **Spec.** Spawn `spec-writer` with
+   `<paths> Feature: <feature, verbatim>` and the consultation path if present.
    Confirm `spec.md` exists when it returns.
 5. **Build.** `F set <job-id> stage=build`. Spawn `builder` **named
    `builder-<job-id>`** with `<paths> Build round 1. Port: <builder_port>.`
+   Include the consultation path if present.
    Then **Check the build**.
 
 ### Check the build
@@ -147,8 +184,8 @@ If this session itself was lost, `/factory resume <job-id>` picks the job up.
 
 ### Approve
 
-`F approve <job-id>`, then spawn `approver` with `<paths> Final round: N.` When
-it returns, run `F decision <job-id>`.
+`F approve <job-id>`, then spawn `approver` with `<paths> Final round: N.`
+and the consultation path if present. When it returns, run `F decision <job-id>`.
 
 Then **hand over to the human**: show `decision.md`'s **In short**, **What each
 department did** and **Your decision** sections, and the **Commands** block

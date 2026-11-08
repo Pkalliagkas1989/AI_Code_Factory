@@ -53,3 +53,14 @@ npx eslint <files>   # lint only the changed files
 - <naming, formatting, how components are structured>
 - <where styles and design tokens live>
 - <anything an agent must never do, e.g. never edit generated files in dist/>
+
+## Marketing (optional)
+
+- Business ID for this product: <lowercase-kebab-case-id, separate from other products>.
+- Private brief/results: `marketing/businesses/<id>/`; keep ignored by git.
+- Approved audience, offer, public claims and pricing: <decisions with dates, or unknown>.
+- Draft/research permissions: <allowed sources and confidentiality limits>.
+- Publishing, customer contact and spend permissions: <explicit human decisions>.
+- Set `marketing_business` in factory/config.md for relevant pre-spec consultation;
+  optionally add the marketing reviewer with actual path prefixes. Keep mandatory
+  security/code reviews and the human merge gate. See marketing/README.md.

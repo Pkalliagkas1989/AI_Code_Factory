@@ -48,6 +48,15 @@ there belongs to the user and to other jobs.
 4. When started for a rework: the `rework-*.md` file named in the prompt, the
    current `build.md` and all round folders, so you know what happened before.
 
+## Marketing input, when present
+
+Read the job's `marketing.md` alongside the spec. Implement only the spec's
+requirements and settled human decisions. Preserve factual qualifications and
+measurement/guardrail requirements; do not turn provisional business claims
+into customer-facing facts. On a rework, flag a refreshed consultation that
+conflicts with the spec rather than silently changing scope. Drafting an email,
+price or campaign never grants permission to send, publish or spend.
+
 ## Build
 
 - First run `cd <worktree> && git branch --show-current`. If it doesn't print
