@@ -28,11 +28,11 @@ Interface: `analyze(data)` consumes `control` and `variant`, each with integer
 `participants` and `successes`; returns rates, Wilson 95% intervals, absolute
 percentage-point difference and relative lift (null for zero baseline).
 
-- [ ] Write CLI tests for 10/100 vs 15/100, published Wilson formula boundaries,
+- [x] Write CLI tests for 10/100 vs 15/100, published Wilson formula boundaries,
   zero exposures, impossible counts, booleans, missing arms and invalid JSON.
-- [ ] Run tests before implementation; expect failure because helper is absent.
-- [ ] Implement input validation and local JSON CLI; no winner or causal output.
-- [ ] Run helper suite; expect all tests pass. Commit with what/why body.
+- [x] Run tests before implementation; expect failure because helper is absent.
+- [x] Implement input validation and local JSON CLI; no winner or causal output.
+- [x] Run helper suite; expect all tests pass. Commit with what/why body.
 
 ## Task 2: Consultant and evidence base
 
@@ -41,12 +41,12 @@ Files: `.claude/skills/marketing/SKILL.md`, `references/`, `templates/`,
 Interface: reports retain business/task identity; stable source IDs in the
 bibliography support research, templates and analysis method documentation.
 
-- [ ] Write workflow, capability/evidence map, ten qualified principles and
+- [x] Write workflow, capability/evidence map, ten qualified principles and
   bibliography using primary publisher/author/institution records.
-- [ ] Add brief, experiment, report and result templates, sanitized factory
+- [x] Add brief, experiment, report and result templates, sanitized factory
   example, three synthetic evaluation cases and analysis method reference.
-- [ ] Validate skill frontmatter and local links. Exercise analysis example.
-- [ ] Run three scenario evaluations; inspect deliverables for the five review
+- [x] Validate skill frontmatter and local links. Exercise analysis example.
+- [x] Run three scenario evaluations; inspect deliverables for the five review
   risks above. Keep raw evaluation artifacts out of the published tree.
 
 ## Task 3: Factory integration and repository documentation
@@ -57,11 +57,22 @@ Files: `.claude/agents/{marketing-consultant,reviewer-marketing,spec-writer,buil
 Interface: optional config `marketing_business` routes pre-spec consultation to
 job `marketing.md`; optional reviewer uses existing PASS/CHANGES protocol.
 
-- [ ] Document consultation timing, missing brief behavior, rework/resume and
+- [x] Document consultation timing, missing brief behavior, rework/resume and
   agent file ownership. Read only the applicable business brief and results.
-- [ ] Add integration tests for optional marketing lens, re-review after changes
+- [x] Add integration tests for optional marketing lens, re-review after changes
   and mandatory security/code retention. No engine changes expected.
-- [ ] Run both Python suites and documentation/skill checks; inspect full diff.
-- [ ] Request independent whole-branch review; resolve material findings.
-- [ ] Record results, remaining gates and next action in the handoff. Commit,
-  push `feat/marketing-consultant`, verify remote SHA; leave main untouched.
+- [x] Run both Python suites and documentation/skill checks; inspect full diff.
+- [x] Request independent whole-branch review; resolve material findings.
+- [x] Record results, remaining gates and next action in `docs/marketing-handoff.md`.
+  Prepare committed `feat/marketing-consultant` for the authorized review push.
+  Publication must be confirmed by remote SHA before reporting completion;
+  leave main untouched.
+
+## Execution record
+
+Implemented inline in the isolated feature worktree. Research and behavior
+follow the recovered approved scope, with the user-confirmed integration/docs
+boundary. No new engine implementation was needed: integration tests verify
+the existing generic lens protocol. The script's RED→GREEN cycle, scenario
+evaluation, independent review, checks and remaining runtime/field gates are
+recorded in the handoff. No unresolved substantive review findings.
