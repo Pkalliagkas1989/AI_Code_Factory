@@ -34,6 +34,13 @@ is a starting point, not customer validation. Ask only for facts that block the
 assignment; meanwhile produce a provisional draft or discovery questions.
 Do not overwrite an existing brief, settled decisions or prior results.
 
+When `factory/config.md` exists, read its `marketing_business` setting. If it
+matches this assignment's business ID, read **Decided by the human** and
+**Notes for agents** before drafting, and treat those decisions as constraints
+alongside the business brief. Do not apply a different business's configured
+choices. An unapproved alternative may be discussed separately; it must not
+silently replace a settled offer, CTA, price or claim in the deliverable.
+
 ## Diagnose, research, produce
 
 1. Identify the likely obstacle: awareness, targeting, positioning, trust,
@@ -80,7 +87,11 @@ marketing system. Stable R IDs resolve to the bibliography.
 
 Use [report](templates/report.md). Standalone work goes in a new
 `marketing/businesses/<id>/runs/<unique-task-id>/report.md`; use a dated descriptive
-ID and add a suffix if occupied. Link any additional requested assets there.
+ID and add a suffix if occupied. Each explicit `/marketing` invocation starts a
+new assignment even when its task text repeats: write a new report and append a
+new history entry with the appropriate draft/planned/observed status. Reuse an existing run only when the user asks
+to resume, inspect or update that run; identical wording alone is not a resume.
+Link any additional requested assets there.
 Append a concise entry to this business's `results.md` using [results](templates/results.md):
 draft/planned/observed status, data provenance, outcome, uncertainty and next
 step. Do not record planned targets as achieved results. Preserve raw data and
@@ -97,6 +108,11 @@ business decisions the approver must surface.
   records. Give author, year, title, venue, DOI/URL, access basis and limitation.
   If only an abstract was read, say so. If research is unavailable, disclose it
   and avoid adding purportedly verified findings or invented citations.
+- Product maturity and negative capability claims need evidence too. Do not
+  infer “early prototype”, “no integrations”, “no customers” or “no results”
+  from missing documentation. Say the stage/capability/result is unverified
+  here unless a source for this named business establishes it. Earlier drafts
+  are not evidence that an assumption became true or a proposal was approved.
 - Preserve equivalent prices, timeframes, denominators, conditions and risks
   across message variants. No fabricated losses, scarcity, testimonials,
   performance claims or guarantees without operational backing.

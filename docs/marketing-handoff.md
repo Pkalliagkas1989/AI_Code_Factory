@@ -3,6 +3,8 @@
 Date: 2026-11-08. Scope: standalone marketing plus repository integration/docs.
 Review branch: `feat/marketing-consultant`, based on `main` at `2851b99`.
 The original `example/todo-app` checkout remains clean and unchanged.
+The user subsequently authorized live testing, feature updates, merge to main
+and a rewrite of the main README.
 
 ## Delivered
 
@@ -51,23 +53,49 @@ The original `example/todo-app` checkout remains clean and unchanged.
 - Independent whole-branch review at `2f4e94c`: no substantive must-fix findings.
   Source spot checks supported bibliography metadata and evidence limitations.
 
-## Remaining gates and next action
+## Live validation follow-up
 
-Review this feature branch before merging. Run a live Claude Code smoke test of
-standalone invocation and configured consultation, interrupted resume, changed-offer
-rework and approver holds in a throwaway project before operational adoption.
-The automated tests exercise the helper and generic reviewer protocol; model
-evaluations exercise instructions, not live Claude Code orchestration or a
-commercial benchmark. Claude Code 2.1.319 is installed locally but no full factory
-job was launched for this change.
+The [live validation report](marketing-live-validation.md) records actual Claude
+Code **2.1.319** runs, prompts, model/runtime settings, observations and limits.
+The new runs replace the earlier “not live-tested” status above:
 
-No actual campaign/customer dataset was supplied. R02 publisher retrieval failed
-in the behavioral evaluator and was disclosed; existing publisher metadata and
-research references were retained without claiming fresh full-text verification.
-A real campaign still needs verified scope/links, business inputs, approved caps,
-contact/publication/spend authorization and a predefined measurement plan.
+- Standalone product and factory-business assignments created real private
+  brief/report/history artifacts in synthetic local projects.
+- Repeated-invocation and matching-business CTA failures were observed, fixed
+  and rechecked with the same prompts. A separate unsupported factory-maturity
+  label was also observed and corrected in a fresh same-prompt report.
+- Hash/prefix checks preserved prior reports, briefs, existing history and
+  other-business records; product content was untouched by standalone work.
+- A complete configured factory job ran consultation, spec, build, security/code/
+  marketing review and approval, ending `ready` with all reviews PASS.
+- Live recovery from helper-recorded marketing/builder interruptions completed
+  consultation before spec and a READY build without rewriting completed inputs.
+- Changed-offer rework refreshed advice, retained settled page content and ended
+  HOLD/`needs-human`. A direct approver scenario also held unmet/unapproved
+  business requirements despite prior technical PASS reviews.
+- Independent review identified a status-label wording conflict (fixed to allow
+  observed history) and a README overstatement (fixed to identify only count and
+  evaluation fixtures as synthetic). No unresolved substantive findings.
 
-No campaign publication, customer contact, ad spend, main merge or deployment
-was performed.
-User authorized pushing this implementation branch for review; the installed
-marketing/factory tools retain their separate no-push/no-merge behavior.
+No factory engine or statistical helper change was needed. The existing 34
+Python tests pass. Skill validation and documentation references are checked
+alongside the feature update. Regression cases D–F are in the skill evaluation
+reference. These runs use actual Claude tools and agents, not the earlier
+instruction-guided simulation.
+
+## Delivery and next action
+
+Live test gates are complete for this change. User-authorized next steps are
+pushing the feature updates, merging to `main`, replacing the main README with
+the reviewed draft, then verifying and pushing main. The original example
+checkout is preserved. The installed tools still do not merge or push.
+
+No actual campaign/customer dataset was supplied. Source access limitations
+remain explicit; no new full-text research review or campaign efficacy claim is
+made. Recorded interruptions are recovery checkpoints, not forced-kill tests.
+UI/API/data reviews, concurrent writers, production deployment and real campaign
+outcomes are not established by these bounded fixtures.
+
+Next operational use: select the real business brief, approve any publication,
+contact or spend, and collect outcomes under a predefined measurement plan.
+No campaign publication, customer contact, ad spend or deployment was performed.

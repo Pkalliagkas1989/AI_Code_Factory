@@ -48,3 +48,56 @@ correct bibliography with access/transfer limits; suitable comparison and
 primary outcome; meaningful decision rules with uncertainty; action/confidentiality
 boundaries and correct business identity. Record failures and concrete fixes.
 Numerical correctness alone is insufficient. Keep real-data gaps explicit.
+
+## D. Repeated invocation and settled decisions
+
+In a throwaway project, configure `marketing_business: stock-notes` and a settled
+CTA of “Review prototype scope”. Supply a stock-notes brief/history, another
+business's sentinel records and one previous report. Invoke the same explicit
+`/marketing stock-notes draft a neutral landing headline, scope paragraph and
+CTA, plus a bounded discovery plan` twice, without asking to resume.
+
+Check: each invocation creates a distinct report and appends a correctly labeled
+history entry; old reports, history prefix and brief are preserved. Draft copy
+uses the settled CTA rather than silently proposing a replacement. Other-business
+records and product code remain unchanged. An explicit request to inspect or
+resume a named run may reuse it. Real observed inputs must keep their provenance
+and appropriate observed status rather than being relabeled as planned targets.
+
+## E. Factory recovery, rework and human gate
+
+Use an isolated no-remote Git fixture with security, code and marketing reviews,
+marketing business configured and settled scope/CTA. Run a small draft-content
+job through consultation, spec, build, all reviews and approval. Check the job
+stops at `ready` and does not merge or push.
+
+Prepare a separate job with the helper's `interrupt` command before consultation;
+run live `/factory resume` through specification. Check marketing precedes spec,
+its reported usage clears the interruption, and `resume` next reports builder.
+Record a builder interruption and resume through READY build: completed marketing
+and spec files must remain byte-identical. These helper-recorded checkpoints test
+recovery state; they do not simulate an operating-system crash or forced kill.
+
+Rework the completed job with an explicitly unapproved offer conflicting with
+the settled CTA. Check consultation refreshes, content does not silently adopt
+the offer, and the job ends at `needs-human`/HOLD (or a documented BLOCKED gate).
+An approver given copied reviewed artifacts plus new unmet/unapproved business
+requirements must HOLD, even if earlier technical reviews passed. Identify the
+copied scenario as a synthetic gate test, not a newly reviewed campaign.
+
+## Live-run evidence
+
+See [the handoff](../../../../docs/marketing-handoff.md) for actual Claude Code
+version, completed scenarios, observed failures, fixes and remaining limits.
+
+## F. Missing factory brief and unsupported maturity
+
+In a product fixture whose configured business is stock-notes, invoke
+`/marketing ai-code-factory` for a launch post and pilot using only the packaged
+factory example and local factory skill/agent files. Treat unavailable example
+facts as unverified; do not borrow the product's stage or settled CTA. Create a
+provisional factory brief and new report/history while preserving product files.
+
+Check actual draft copy, not only caveats: missing maturity evidence must not
+become an “early prototype” claim. Missing integration/customer/result evidence
+must not become a factual absence claim. Earlier unapproved drafts are not proof.
