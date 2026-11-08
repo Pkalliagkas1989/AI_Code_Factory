@@ -340,5 +340,47 @@ class ChainMergeTest(FactoryTest):
         self.assertTrue(self.repo.f("done", "001-first")["merged"])
 
 
+class MarketingIntegrationTest(FactoryTest):
+    """Optional marketing uses the existing lens protocol, not a new engine."""
+
+    def setUp(self):
+        super().setUp()
+        path = self.repo.root / "factory" / "config.md"
+        path.write_text(CONFIG.replace("reviewers: security, code", "reviewers: security, code, marketing")
+                        + "\n")
+        # Config keys must be above the first ## section.
+        path.write_text(path.read_text().replace("always: security, code",
+                        "always: security, code\npaths.marketing: content/\nmarketing_business: sample-product"))
+        self.repo.f("new", "launch", "Launch copy")
+
+    def test_marketing_lens_runs_for_matching_content_alongside_required_reviews(self):
+        wt = Path(self.repo.job("001-launch")["worktree"])
+        (wt / "content").mkdir()
+        self.repo.commit_in("001-launch", "content/landing.md")
+        result = self.repo.f("start-round", "001-launch", "1")
+        self.assertEqual([r["lens"] for r in result["run"]], ["security", "code", "marketing"])
+        self.assertEqual(self.repo.job("001-launch")["reviews"]["marketing"], "pending")
+
+    def test_unrelated_change_skips_marketing_but_keeps_required_reviews(self):
+        self.repo.commit_in("001-launch", "logic.txt")
+        result = self.repo.f("start-round", "001-launch", "1")
+        self.assertEqual([r["lens"] for r in result["run"]], ["security", "code"])
+        self.assertEqual([r["lens"] for r in result["skipped"]], ["marketing"])
+
+    def test_marketing_changes_force_another_review_when_fix_is_outside_paths(self):
+        wt = Path(self.repo.job("001-launch")["worktree"])
+        (wt / "content").mkdir()
+        self.repo.commit_in("001-launch", "content/landing.md")
+        self.repo.f("start-round", "001-launch", "1")
+        for lens, verdict in [("security", "PASS"), ("code", "PASS"), ("marketing", "CHANGES")]:
+            self.repo.write("001-launch", f"round-1/review-{lens}.md", f"VERDICT: {verdict}\n\n## Why\n- Evidence needed.\n")
+            result = self.repo.f("verdict", "001-launch", "1", lens)
+        self.assertEqual(result["round_result"], "CHANGES")
+        self.repo.commit_in("001-launch", "evidence.md")
+        result = self.repo.f("start-round", "001-launch", "2")
+        self.assertEqual([r["lens"] for r in result["run"]], ["security", "code", "marketing"])
+        self.assertEqual(result["run"][-1]["reason"], "asked for changes last round")
+
+
 if __name__ == "__main__":
     unittest.main()

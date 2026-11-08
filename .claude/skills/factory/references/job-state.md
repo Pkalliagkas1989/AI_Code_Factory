@@ -18,6 +18,7 @@ Inside a job folder:
 
 ```
 job.json                      state, written only by the script, read by the dashboard
+marketing.md                  optional marketing-consultant input; no new stage
 spec.md                       spec-writer
 build.md                      builder
 rework-<k>.md                 orchestrator, from /factory rework
@@ -96,3 +97,16 @@ not listed in `always`. When in doubt, a lens runs.
 Each agent's file sets its model. One exception: when **every** file the job
 changed matches `light_paths` (a prefix, or a `*.ext` pattern), the security
 reviewer runs on `sonnet` instead of `opus`. Any code change keeps it on `opus`.
+
+## Marketing integration
+
+`marketing_business` is read by the orchestrator directly from config.md. It
+selects a private business brief for optional consultation before specification;
+it does not change job.json. Consultation output is job `marketing.md`, passed
+to the spec writer, builder and approver. Resume/rework rules live in SKILL.md.
+
+The optional `marketing` reviewer uses the existing generic lens selection,
+`review-marketing.md` and PASS/CHANGES handling. No Python or dashboard schema
+extension is required. Security/code remain mandatory. Business/private raw
+data stays outside job reports; the dashboard serves job files to anyone with
+access to its HTTP server.

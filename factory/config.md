@@ -9,8 +9,14 @@ always: security, code
 paths.ux: src/
 paths.ui: src/
 light_paths: *.md, docs/
+marketing_business:
 
 <!--
+marketing_business  Optional business ID for pre-spec consultation on relevant jobs.
+                    Empty disables consultation. Read by the orchestrator, not factory.py.
+                    Private brief: marketing/businesses/<id>/brief.md.
+                    To enable marketing review separately, append marketing to reviewers
+                    and set paths.marketing to actual path prefixes; see MANUAL.md.
 base_branch  The branch jobs start from and merge back into.
 reviewers    Review lenses, each matching .claude/agents/reviewer-<lens>.md.
              Web apps: security, ux, ui, code. Backends: security, api, data, code.
