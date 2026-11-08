@@ -85,10 +85,16 @@ instruction-guided simulation.
 
 ## Delivery and next action
 
-Live test gates are complete for this change. User-authorized next steps are
-pushing the feature updates, merging to `main`, replacing the main README with
-the reviewed draft, then verifying and pushing main. The original example
-checkout is preserved. The installed tools still do not merge or push.
+Live test gates are complete for this change. Feature update `63e9aad` was
+pushed to `feat/marketing-consultant` and merged into `main` by merge commit
+`77f22c7`, as explicitly authorized by the user. The main README was rewritten
+around the two commands, setup, optional integration, evidence and validation.
+The original example checkout is preserved. The installed tools still do not
+merge or push; this repository-maintenance merge was separately authorized.
+On merged main, factory tests passed 26/26, analysis tests passed 8/8, the
+skill validator passed, all 70 checked local Markdown references resolved, and
+git whitespace checks passed. Feature ancestry was verified. Main publication
+is checked against the remote commit before completion is reported.
 
 No actual campaign/customer dataset was supplied. Source access limitations
 remain explicit; no new full-text research review or campaign efficacy claim is

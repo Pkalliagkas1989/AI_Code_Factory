@@ -76,3 +76,11 @@ boundary. No new engine implementation was needed: integration tests verify
 the existing generic lens protocol. The script's RED→GREEN cycle, scenario
 evaluation, independent review, checks and remaining runtime/field gates are
 recorded in the handoff. No unresolved substantive review findings.
+
+## Later delivery authorization
+
+The 2026-11-08 follow-up explicitly authorized live Claude Code testing, fixes
+on the same feature branch, merging to main and rewriting the main README.
+That supersedes the original review-only publication boundary for this repository
+maintenance task. Installed factory/marketing behavior keeps its no-merge/no-push
+boundary. Actual runs, fixes and delivery are recorded in the handoff.
