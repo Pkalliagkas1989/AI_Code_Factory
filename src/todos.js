@@ -1,10 +1,19 @@
 // Pure todo-list logic. No DOM here, so every function is unit-tested.
 // A todo is { id, text, done }. Functions return new arrays and never mutate.
 
+function nextId(items) {
+  const max = items.reduce((value, item) => Math.max(value, item.id), 0)
+  if (max < Number.MAX_SAFE_INTEGER) return max + 1
+  const used = new Set(items.map(item => item.id))
+  let id = 1
+  while (used.has(id)) id++
+  return id
+}
+
 export function addTodo(todos, text) {
   const trimmed = text.trim()
   if (!trimmed) return todos
-  const id = todos.reduce((max, t) => Math.max(max, t.id), 0) + 1
+  const id = nextId(todos)
   return [...todos, { id, text: trimmed, done: false }]
 }
 
@@ -62,7 +71,7 @@ export function listNameError(lists, name, ownId) {
 
 export function addList(lists, name) {
   if (listNameError(lists, name)) return lists
-  const id = lists.reduce((max, l) => Math.max(max, l.id), 0) + 1
+  const id = nextId(lists)
   return [...lists, { id, name: name.trim(), todos: [] }]
 }
 
@@ -84,19 +93,49 @@ function parse(raw) {
   try { return JSON.parse(raw) } catch { return null }
 }
 
-function isList(l) {
-  return typeof l?.id === 'number' && typeof l.name === 'string' && Array.isArray(l.todos)
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isId(id) {
+  return Number.isSafeInteger(id) && id > 0
+}
+
+function hasUniqueIds(items) {
+  return new Set(items.map((item) => item.id)).size === items.length
+}
+
+function isTodo(todo) {
+  return isRecord(todo) && isId(todo.id) && typeof todo.text === 'string' &&
+    todo.text.trim().length > 0 && typeof todo.done === 'boolean'
+}
+
+function isTodoArray(todos) {
+  return Array.isArray(todos) && todos.every(isTodo) && hasUniqueIds(todos)
+}
+
+function isList(list) {
+  return isRecord(list) && isId(list.id) && typeof list.name === 'string' &&
+    list.name.trim().length > 0 && list.name.trim().length <= MAX_LIST_NAME &&
+    isTodoArray(list.todos)
+}
+
+function isListArray(lists) {
+  return Array.isArray(lists) && lists.length > 0 && lists.every(isList) &&
+    hasUniqueIds(lists) &&
+    new Set(lists.map((list) => list.name.trim().toLowerCase())).size === lists.length
 }
 
 // Builds { lists, openId } from the raw localStorage strings: the saved lists
-// when valid, otherwise one 'My todos' list holding the old todos.
+// when valid, otherwise one 'My todos' list holding validated old todos.
+// Reject malformed snapshots as a whole; leave the raw sources untouched.
 export function initialState(rawLists, rawTodos) {
   const saved = parse(rawLists)
-  if (Array.isArray(saved?.lists) && saved.lists.length > 0 && saved.lists.every(isList)) {
+  if (isRecord(saved) && isListArray(saved.lists)) {
     const open = saved.lists.find((l) => l.id === saved.openId) ?? saved.lists[0]
     return { lists: saved.lists, openId: open.id }
   }
   const old = parse(rawTodos)
-  const todos = Array.isArray(old) ? old : []
+  const todos = isTodoArray(old) ? old : []
   return { lists: [{ id: 1, name: DEFAULT_LIST_NAME, todos }], openId: 1 }
 }

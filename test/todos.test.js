@@ -233,3 +233,89 @@ test('initialState opens the first list when the saved id is gone or missing', (
   assert.equal(initialState(JSON.stringify({ lists, openId: 7 }), null).openId, 1)
   assert.equal(initialState(JSON.stringify({ lists }), null).openId, 1)
 })
+
+const validTodo = () => ({ id: 1, text: 'Saved task', done: false })
+const validList = () => ({ id: 1, name: 'Saved list', todos: [validTodo()] })
+const legacyTodos = [{ id: 9, text: 'Recover legacy task', done: true }]
+const migrated = (todos) => ({ lists: [{ id: 1, name: 'My todos', todos }], openId: 1 })
+
+const invalidTodos = [
+  ['null entry', null],
+  ['array entry', []],
+  ['string entry', 'task'],
+  ['missing id', { text: 'task', done: false }],
+  ...[0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1'].map((id) => [`id ${id} (${typeof id})`, { ...validTodo(), id }]),
+  ['missing text', { id: 1, done: false }],
+  ['nonstring text', { ...validTodo(), text: {} }],
+  ['empty text', { ...validTodo(), text: '' }],
+  ['whitespace text', { ...validTodo(), text: ' \n\t ' }],
+  ['missing done', { id: 1, text: 'task' }],
+  ['nonboolean done', { ...validTodo(), done: 'false' }],
+]
+
+for (const [reason, todo] of invalidTodos) {
+  test(`initialState rejects ${reason} in current and legacy todos`, () => {
+    const lists = [{ ...validList(), todos: [todo] }]
+    assert.deepEqual(initialState(JSON.stringify({ lists, openId: 1 }), JSON.stringify(legacyTodos)), migrated(legacyTodos))
+    assert.deepEqual(initialState(null, JSON.stringify([todo])), migrated([]))
+  })
+}
+
+const invalidLists = [
+  ['null entry', [null]],
+  ['array entry', [[]]],
+  ['string entry', ['list']],
+  ...[0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1'].map((id) => [`id ${id} (${typeof id})`, [{ ...validList(), id }]]),
+  ['missing name', [{ id: 1, todos: [] }]],
+  ['nonstring name', [{ ...validList(), name: 4 }]],
+  ['empty name', [{ ...validList(), name: '' }]],
+  ['whitespace name', [{ ...validList(), name: ' \t ' }]],
+  ['overlong name', [{ ...validList(), name: 'a'.repeat(41) }]],
+  ['missing todos', [{ id: 1, name: 'List' }]],
+  ['nonarray todos', [{ ...validList(), todos: {} }]],
+  ['duplicate list ids', [validList(), { ...validList(), name: 'Other' }]],
+  ['duplicate trimmed names ignoring case', [validList(), { ...validList(), id: 2, name: ' SAVED LIST ' }]],
+  ['duplicate todo ids', [{ ...validList(), todos: [validTodo(), { ...validTodo(), text: 'Other task' }] }]],
+]
+
+for (const [reason, lists] of invalidLists) {
+  test(`initialState rejects ${reason} in saved lists and recovers validated legacy todos`, () => {
+    assert.deepEqual(initialState(JSON.stringify({ lists, openId: 1 }), JSON.stringify(legacyTodos)), migrated(legacyTodos))
+    assert.deepEqual(initialState(JSON.stringify({ lists, openId: 1 }), '[null]'), migrated([]))
+  })
+}
+
+test('initialState rejects duplicate legacy todo ids without partially migrating', () => {
+  assert.deepEqual(initialState(null, JSON.stringify([validTodo(), { ...validTodo(), text: 'Other' }])), migrated([]))
+})
+
+test('initialState preserves valid text, boundary ids and names, with todo ids scoped per list', () => {
+  const markup = '<img src=x onerror="alert(1)">'
+  const lists = [
+    { id: Number.MAX_SAFE_INTEGER, name: ` ${'a'.repeat(40)} `, todos: [{ id: Number.MAX_SAFE_INTEGER, text: ` ${markup} `, done: true }] },
+    { id: 2, name: markup, todos: [{ id: Number.MAX_SAFE_INTEGER, text: 'Other', done: false }] },
+  ]
+  const raw = JSON.stringify({ lists, openId: 2 })
+  assert.deepEqual(initialState(raw, '[null]'), { lists, openId: 2 })
+  assert.deepEqual(initialState(null, JSON.stringify(lists[0].todos)), migrated(lists[0].todos))
+  assert.equal(raw, JSON.stringify({ lists, openId: 2 }))
+})
+
+test('initialState falls back to the first valid list for malformed saved open ids', () => {
+  const lists = [validList(), { ...validList(), id: 2, name: 'Other' }]
+  for (const openId of ['2', null, {}, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.deepEqual(initialState(JSON.stringify({ lists, openId }), null), { lists, openId: 1 })
+  }
+})
+
+test('safe maximum persisted IDs remain unique and survive add and reload', () => {
+  const snapshot = { lists: [{ id: Number.MAX_SAFE_INTEGER, name: 'Existing',
+    todos: [{ id: Number.MAX_SAFE_INTEGER, text: 'Existing', done: false }] }], openId: Number.MAX_SAFE_INTEGER }
+  const state = initialState(JSON.stringify(snapshot), null)
+  let lists = setListTodos(state.lists, state.openId, addTodo(addTodo(state.lists[0].todos, 'Next'), 'Third'))
+  lists = addList(addList(lists, 'Next list'), 'Third list')
+  const expected = { lists, openId: state.openId }
+  assert.deepEqual(initialState(JSON.stringify(expected), null), expected)
+  assert.equal(new Set(lists.map(l => l.id)).size, 3)
+  assert.equal(new Set(lists[0].todos.map(t => t.id)).size, 3)
+})
