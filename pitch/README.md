@@ -20,3 +20,22 @@ ends: the factory recommends, and you merge.
 
 Every number in the video comes from the real record of job 002 in the todo
 app. The music is an original track generated for it.
+
+To record the source locally, use Node.js 22 or newer and the default macOS
+Google Chrome installation:
+
+```sh
+node pitch/source/capture.mjs /tmp/pitch-frames 30 20
+node pitch/source/capture.mjs /tmp/pitch-stills 30 20 0,5,10,20
+node --test pitch/source/test-capture.mjs
+```
+
+FPS and duration must be finite positive numbers, producing 1–18,000 frames;
+still times must lie between zero and the specified duration, with at most
+18,000 entries. Defaults remain 30 fps and 20 seconds. The recorder launches
+Chrome with a unique temporary profile and an automatically allocated local
+CDP port, creates its own page, and removes the profile when it finishes or
+fails. Startup and each CDP operation have a 10-second timeout. SIGINT/SIGTERM
+also trigger cleanup; Chrome receives SIGTERM, then SIGKILL if needed. Forced
+termination of the recorder (for example SIGKILL or machine shutdown) cannot
+run cleanup. Frames already written remain available after a failed capture.

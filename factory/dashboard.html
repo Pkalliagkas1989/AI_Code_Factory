@@ -77,8 +77,28 @@
 <script>
 const STAGES = ['spec', 'build', 'review', 'approve', 'ready', 'needs-human', 'merged']
 const LABELS = { ready: 'ready to merge', 'needs-human': 'needs you' }
+const DISPLAY_ROUNDS = 100  // lifetime history can span multiple rework cycles
 
-const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+const esc = (s) => (typeof s === 'string' ? s : '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+// Treat job.json as untrusted metadata; keep rendering and totals bounded.
+const record = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) ? v : {}
+const safeNumber = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER
+const metrics = (v) => Object.fromEntries(Object.entries(record(v)).filter(([, n]) => safeNumber(n)))
+const verdict = (v) => ['PASS', 'CHANGES', 'pending', 'skipped'].includes(v) ? v : 'pending'
+function normalizeJob(value, id) {
+  const job = record(value)
+  return {
+    id: typeof id === 'string' ? id : typeof job.id === 'string' ? job.id : '',
+    stage: STAGES.includes(job.stage) ? job.stage : 'needs-human',
+    feature: typeof job.feature === 'string' ? job.feature : '',
+    after: typeof job.after === 'string' ? job.after : '',
+    round: Number.isSafeInteger(job.round) && job.round >= 0 ? job.round : 0,
+    reviews: record(job.reviews),
+    rounds: Array.isArray(job.rounds) ? job.rounds.slice(-DISPLAY_ROUNDS).map(record) : [],
+    tokens: metrics(job.tokens), seconds: metrics(job.seconds), interrupted: record(job.interrupted)
+  }
+}
 
 async function get(url) {
   const r = await fetch(url, { cache: 'no-store' })
@@ -86,7 +106,7 @@ async function get(url) {
   return r.text()
 }
 
-// python3 -m http.server renders folders as an HTML list of links
+// python3 -m http.server --bind 127.0.0.1 renders folders as an HTML list of links
 async function listDir(url) {
   const html = new DOMParser().parseFromString(await get(url), 'text/html')
   return [...html.querySelectorAll('a')].map((a) => decodeURIComponent(a.getAttribute('href')))
@@ -96,7 +116,7 @@ async function loadJobs() {
   const ids = (await listDir('jobs/')).filter((h) => /^\d{3}-.+\/$/.test(h)).map((h) => h.slice(0, -1))
   const jobs = await Promise.all(ids.map(async (id) => {
     try {
-      const job = JSON.parse(await get(`jobs/${id}/job.json`))
+      const job = normalizeJob(JSON.parse(await get(`jobs/${encodeURIComponent(id)}/job.json`)), id)
       job.rounds = await loadRounds(job)
       return job
     } catch { return null }  // job folder claimed but job.json not written yet
@@ -107,11 +127,11 @@ async function loadJobs() {
 // Earlier rounds come from their review files; the current round from job.json
 async function loadRounds(job) {
   const rounds = []
-  for (let n = 1; n <= job.round; n++) {
+  for (let n = Math.max(1, job.round - DISPLAY_ROUNDS + 1); n <= job.round; n++) {
     if (n === job.round) { rounds.push(job.reviews); continue }
     const r = {}
     for (const k of Object.keys(job.reviews)) {
-      try { r[k] = /^VERDICT:\s*(PASS|CHANGES)/.exec(await get(`jobs/${job.id}/round-${n}/review-${k}.md`))?.[1] ?? 'pending' }
+      try { r[k] = /^VERDICT:\s*(PASS|CHANGES)/.exec(await get(`jobs/${encodeURIComponent(job.id)}/round-${n}/review-${encodeURIComponent(k)}.md`))?.[1] ?? 'pending' }
       catch { r[k] = 'skipped' }
     }
     rounds.push(r)
@@ -119,17 +139,22 @@ async function loadRounds(job) {
   return rounds
 }
 
-const sum = (o) => Object.values(o || {}).reduce((a, b) => a + b, 0)
-const duration = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
+const sum = (o) => {
+  const total = Object.values(metrics(o)).reduce((a, b) => a + b, 0)
+  return safeNumber(total) ? total : 0  // reject an overflowing aggregate too
+}
+const duration = (s) => !safeNumber(s) ? '–' : (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
 
 // Runs cut short by a usage limit or a crash, until their cost is recorded
 function interrupted(job) {
+  job = normalizeJob(job)
   const runs = Object.keys(job.interrupted || {})
   return runs.length ? `<div class="round">${runs.map((r) => `<span class="chip interrupted">${esc(r)} interrupted</span>`).join('')}</div>` : ''
 }
 
 // Total tokens and agent time the job's agents reported; shown so cost stays visible
 function tokens(job) {
+  job = normalizeJob(job)
   const runs = Object.keys(job.tokens || {}).length
   if (!runs) return ''
   const time = sum(job.seconds) ? ` · ${duration(sum(job.seconds))}` : ''
@@ -138,9 +163,10 @@ function tokens(job) {
 
 // One row per agent run, largest first, with its share of the job's tokens
 function costTable(job) {
+  job = normalizeJob(job)
   const total = sum(job.tokens)
   if (!total) return '<p>No agent has reported its tokens yet.</p>'
-  const max = Math.max(...Object.values(job.tokens))  // bars compare runs, so the largest fills the column
+  const max = Object.values(job.tokens).reduce((a, b) => Math.max(a, b), 0)  // bars compare runs, so the largest fills the column
   const rows = Object.entries(job.tokens).sort((a, b) => b[1] - a[1]).map(([run, t]) => {
     const s = job.seconds?.[run]
     return `<tr><td>${esc(run)}</td><td class="num">${(t / 1000).toFixed(1)}k</td>
@@ -158,12 +184,14 @@ function costTable(job) {
 }
 
 function card(job) {
+  job = normalizeJob(job)
   const rounds = job.rounds.map((r, i) =>
-    `<div class="round"><span class="n">R${i + 1}</span>${Object.keys(job.reviews).map((k) => `<span class="chip ${r[k]}">${k}</span>`).join('')}</div>`
+    `<div class="round"><span class="n">R${Math.max(1, job.round - job.rounds.length + 1) + i}</span>${Object.keys(job.reviews).map((k) => `<span class="chip ${esc(verdict(r[k]))}">${esc(k)}</span>`).join('')}</div>`
   ).join('')
-  return `<div class="card ${['ready', 'needs-human'].includes(job.stage) ? 'human' : ''}" tabindex="0" data-id="${esc(job.id)}">
+  const historyNote = job.round > DISPLAY_ROUNDS ? `<div class="tokens">Showing latest ${DISPLAY_ROUNDS} rounds</div>` : ''
+  return `<div class="card ${esc(['ready', 'needs-human'].includes(job.stage) ? 'human' : '')}" tabindex="0" data-id="${esc(job.id)}">
     <div class="id">${esc(job.id)}${job.after ? `<span class="after">after ${esc(job.after.slice(0, 3))}</span>` : ''}</div>
-    <div class="feat">${esc(job.feature || '')}</div>${rounds}${interrupted(job)}${tokens(job)}</div>`
+    <div class="feat">${esc(job.feature || '')}</div>${historyNote}${rounds}${interrupted(job)}${tokens(job)}</div>`
 }
 
 function render(jobs) {
@@ -202,7 +230,7 @@ function md(src) {
 }
 
 async function openJob(id) {
-  const base = `jobs/${id}/`
+  const base = `jobs/${encodeURIComponent(id)}/`
   const files = []
   for (const h of await listDir(base)) {
     if (/^round-\d+\/$/.test(h)) for (const f of await listDir(base + h)) { if (/\.(md|png)$/.test(f)) files.push(h + f) }
@@ -217,7 +245,7 @@ async function openJob(id) {
   const show = async (f) => {
     nav.querySelectorAll('[data-f]').forEach((b) => b.classList.toggle('on', b.dataset.f === f))
     if (f === 'cost') {
-      document.getElementById('doc').innerHTML = costTable(JSON.parse(await get(base + 'job.json')))
+      document.getElementById('doc').innerHTML = costTable(normalizeJob(JSON.parse(await get(base + 'job.json')), id))
       return
     }
     if (f.endsWith('.png')) {  // reviewers' screenshots of the running app
@@ -247,7 +275,7 @@ async function tick() {
     render(jobs)
     status.textContent = `${jobs.length} job${jobs.length === 1 ? '' : 's'} · updated ${new Date().toLocaleTimeString()}`
   } catch (err) {
-    status.textContent = 'cannot read jobs/ — run "python3 -m http.server" from the factory folder'
+    status.textContent = 'cannot read jobs/ — run "python3 -m http.server --bind 127.0.0.1" from the factory folder'
   }
 }
 tick()

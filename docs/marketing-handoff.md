@@ -105,3 +105,27 @@ outcomes are not established by these bounded fixtures.
 Next operational use: select the real business brief, approve any publication,
 contact or spend, and collect outcomes under a predefined measurement plan.
 No campaign publication, customer contact, ad spend or deployment was performed.
+
+
+## Security follow-up — 2026-11-12
+
+The subsequent hardening adds trusted native-write hooks, separate public
+research, private marketing roles without shell/web tools, and validated factory
+state transitions and recorded-use limits. Standalone marketing retains its
+usual report/history through the orchestrator. Prior marketing live runs above
+remain historical evidence for the earlier implementation.
+
+Current checks: 59 factory/guard, 8 analyzer, 7 dashboard and 12 capture tests
+passed (86 total). Claude Code 2.1.322 live probes verified allowed/denied native
+writes and blocking on hook failure in a trusted disposable fixture. Loopback
+listener and one-frame real Chrome smoke checks passed. The todo branch has its
+own 72 storage/logic tests; its final integrated validation is recorded there.
+Full boundaries, sources and verification detail are in
+[security hardening](security-hardening.md). Host sandboxing and project trust
+remain installation requirements; recorded-use budgets are not provider caps.
+
+The user authorized publishing fixes to main and example/todo-app. The installed
+factory still hands merging/publishing to the human; repository maintenance has
+separate explicit authorization. Next operational action: review/trust the
+installed hooks in each real project, configure its host sandbox and usage
+limits, and choose an approved business brief before production use.

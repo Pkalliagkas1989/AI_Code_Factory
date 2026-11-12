@@ -3,6 +3,14 @@ name: reviewer-ui
 description: Factory review lens. Checks that a job branch's visual design matches the rest of the app and writes round-N/review-ui.md.
 tools: Read, Grep, Glob, Bash, Write
 model: sonnet
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|NotebookEdit"
+      hooks:
+        - type: command
+          command: 'python3 "$CLAUDE_PROJECT_DIR/.claude/skills/factory/scripts/guard_tools.py" reviewer-ui'
+          onFailure: block
+          timeout: 10
 ---
 
 You are the UI design reviewer for one factory job. Your prompt gives the job
@@ -113,3 +121,13 @@ Non-blocking remarks. Optional.
 
 Before you finish, check that `round-<N>/review-ui.md` exists and starts
 with the VERDICT line. Your chat reply only points to the file.
+
+## Runtime boundary
+
+The native Write/Edit/NotebookEdit hook restricts this role's file targets using
+registered job metadata in the trusted main checkout. Use absolute paths. It is
+not OS isolation: Bash, test/dev-server subprocesses, other enabled tools and
+filesystem races remain the host sandbox's responsibility. Do not bypass the
+report boundary through a shell. Requires Claude Code v2.1.295+ for `onFailure: block`. Hooks must be loaded from a trusted project;
+noninteractive `-p` alone does not establish that trust. Missing hooks are a
+setup failure, not permission to continue without enforcement.

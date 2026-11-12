@@ -8,6 +8,8 @@ stdout. Exit code 1 means stop and tell the user: stderr says why.
                             claim a job id, write job.json, create the worktree
                             (from the base branch, or on top of another job's branch)
   info <job-id>             paths, ports, the prompt prefix and the human's decisions
+  invalidate <job-id>       stop stale work for explicit human rework
+  budget <job-id>           recorded usage totals and dispatch gate
   resume <job-id>           what runs next, after an interruption or a lost session
   interrupt <job-id> <run>  record that an agent run stopped early (usage limit, crash)
   start-round <job-id> <N>  choose this round's reviewers and record the round
@@ -21,6 +23,13 @@ stdout. Exit code 1 means stop and tell the user: stderr says why.
                             (+= adds to it, for a run resumed after an interruption)
 """
 import fnmatch
+try:
+    import fcntl
+except ImportError:
+    raise SystemExit("factory: a POSIX host (macOS/Linux) is required for safe file locking")
+import stat
+import tempfile
+from contextlib import contextmanager
 import json
 import os
 import re
@@ -33,6 +42,8 @@ from pathlib import Path
 
 STAGES = ("spec", "build", "review", "approve", "ready", "needs-human", "merged")
 MAX_ROUNDS = 3  # round 1 plus at most 2 resumes (SKILL.md: MAX_RESUMES = 2)
+JOB_ID = re.compile(r"[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+){0,3}")
+LENS = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*")
 BROWSER_LENSES = ("ux", "ui")  # reviews that must open the running app
 
 
@@ -82,11 +93,80 @@ def config():
     missing = {"security", "code"} - set(cfg["always"])
     if missing:
         fail(f"config.md: always must include {', '.join(sorted(missing))}")
+    for field in ("reviewers", "always"):
+        values = cfg[field]
+        if len(values) != len(set(values)) or any(not LENS.fullmatch(v) for v in values):
+            fail(f"config.md: {field} contains duplicate or malformed reviewer names")
+    missing_reviewers = {"security", "code", *cfg["always"]} - set(cfg["reviewers"])
+    if missing_reviewers:
+        fail(f"config.md: reviewers must include {', '.join(sorted(missing_reviewers))}")
+    for key, default in (("max_chain_jobs", 3), ("max_job_tokens", 500000), ("max_job_seconds", 3600)):
+        value = keys.get(key, str(default))
+        if not re.fullmatch(r"[1-9][0-9]*", value):
+            fail(f"config.md: {key} must be a positive integer")
+        cfg[key] = int(value)
     return cfg
 
 
+def jobs_root(create=False):
+    root = repo() / "factory"
+    if root.is_symlink():
+        fail("factory directory must not be a symlink")
+    jobs = root / "jobs"
+    if jobs.is_symlink():
+        fail("factory/jobs must not be a symlink")
+    if create:
+        jobs.mkdir(parents=True, exist_ok=True)
+    return jobs
+
+
+def validate_job_id(job_id):
+    if not isinstance(job_id, str) or not JOB_ID.fullmatch(job_id):
+        fail("job id must be a three-digit number and 1 to 4 lowercase slug words")
+    return job_id
+
+
+def read_regular(path):
+    if path.parent.is_symlink():
+        fail(f"report directory must not be a symlink: {path.parent}")
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "r", encoding="utf-8") as f:
+            info = os.fstat(f.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > 1024 * 1024:
+                fail(f"expected a regular, singly linked file <= 1 MiB: {path}")
+            return f.read(1024 * 1024 + 1)
+    except (OSError, UnicodeError) as exc:
+        fail(f"cannot read {path}: {exc}")
+
+
+@contextmanager
+def job_transaction(key):
+    locks = jobs_root(create=True) / ".locks"
+    if locks.is_symlink():
+        fail("job lock directory must not be a symlink")
+    locks.mkdir(exist_ok=True)
+    fd = os.open(locks / f"{key}.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except (BlockingIOError, PermissionError):
+                if time.monotonic() >= deadline:
+                    fail(f"job {key} is busy; retry after the active command finishes")
+                time.sleep(.02)
+        yield
+    finally:
+        os.close(fd)
+
+
 def job_dir(job_id):
-    d = repo() / "factory" / "jobs" / job_id
+    validate_job_id(job_id)
+    d = jobs_root() / job_id
+    if d.is_symlink():
+        fail("job directory must not be a symlink")
     if not (d / "job.json").is_file():
         fail(f"no job {job_id} (expected {d}/job.json)")
     return d
@@ -119,21 +199,73 @@ def base_ref(job, cfg):
 
 
 def load(job_id):
-    return json.loads((job_dir(job_id) / "job.json").read_text())
+    try:
+        job = json.loads(read_regular(job_dir(job_id) / "job.json"))
+    except ValueError as exc:
+        fail(f"invalid job JSON: {exc}")
+    if not isinstance(job, dict) or job.get("id") != job_id or job.get("branch") != f"factory/{job_id}":
+        fail("job state identity does not match its directory/branch")
+    if job.get("stage") not in STAGES or type(job.get("round")) is not int or job["round"] < 0:
+        fail("invalid job stage or round")
+    reviews = job.get("reviews")
+    if not isinstance(reviews, dict) or any(not LENS.fullmatch(k) or v not in ("pending", "PASS", "CHANGES", "skipped") for k, v in reviews.items()):
+        fail("invalid job reviewer state")
+    if not {"security", "code"}.issubset(reviews) or any(reviews[x] == "skipped" for x in ("security", "code")):
+        fail("job state must retain mandatory security and code review")
+    for field in ("tokens", "seconds"):
+        costs = job.get(field, {})
+        if not isinstance(costs, dict) or any(not isinstance(k, str) or not k.strip() or type(v) is not int or v < 0 for k, v in costs.items()):
+            fail(f"invalid {field} usage records")
+    return job
 
 
 def save(job):
-    # Write then rename, so the dashboard never reads a half-written file
-    path = repo() / "factory" / "jobs" / job["id"] / "job.json"
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(job, indent=2) + "\n")
-    os.replace(tmp, path)
+    validate_job_id(job["id"])
+    directory = jobs_root() / job["id"]
+    if directory.is_symlink():
+        fail("job directory must not be a symlink")
+    path = directory / "job.json"
+    fd, tmp = tempfile.mkstemp(prefix=".job-", suffix=".tmp", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(job, f, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def budget(job, cfg):
+    tokens = sum(job.get("tokens", {}).values())
+    seconds = sum(job.get("seconds", {}).values())
+    return {"allowed": tokens < cfg["max_job_tokens"] and seconds < cfg["max_job_seconds"],
+            "tokens": tokens, "seconds": seconds,
+            "max_tokens": cfg["max_job_tokens"], "max_seconds": cfg["max_job_seconds"],
+            "scope": "reported completed usage; not an in-flight provider spending cap"}
+
+
+def require_budget(job, cfg):
+    if not budget(job, cfg)["allowed"]:
+        fail("recorded job budget exhausted; human must review limits before more work")
+
+
+def require_head(job, expected):
+    if not expected or git("rev-parse", job["branch"]).stdout.strip() != expected:
+        fail("job branch head changed or was not recorded; rebuild/review the current commit")
+
+
+def require_stage(job, *allowed):
+    if job["stage"] not in allowed:
+        fail(f"job is in stage {job['stage']}; expected {' or '.join(allowed)}")
 
 
 def first_line(path, pattern, what):
     if not path.is_file():
         fail(f"{path} is missing")
-    lines = path.read_text().splitlines()
+    lines = read_regular(path).splitlines()
     m = re.fullmatch(pattern, lines[0].strip()) if lines else None
     if not m:
         fail(f"{what}: first line of {path} must match {pattern!r}, got {lines[0] if lines else '(empty)'!r}")
@@ -157,6 +289,7 @@ def info(job, cfg):
         "builder_port": 5100 + 10 * n,
         "reviewer_ports": {lens: 5101 + 10 * n + i for i, lens in enumerate(cfg["reviewers"])},
         "decided": cfg["decided"],
+        "budget": budget(job, cfg),
     }
 
 
@@ -171,13 +304,26 @@ def cmd_new(slug, feature, *rest):
     base = load(after)["branch"] if after else cfg["base"]
     if git("rev-parse", "--verify", "--quiet", base, check=False).returncode:
         fail(f"base branch {base} does not exist")
+    depth, previous, seen = 1, after, set()
+    while previous:
+        if previous in seen:
+            fail("cyclic job chain")
+        seen.add(previous)
+        depth += 1
+        previous = load(previous).get("after")
+    if depth > cfg["max_chain_jobs"]:
+        fail("configured max_chain_jobs limit exceeded; human must review a larger chain")
     root = repo()
-    jobs = root / "factory" / "jobs"
+    jobs = jobs_root(create=True)
     claims = jobs / ".claims"  # one empty file per number; hidden from the dashboard
+    if claims.is_symlink():
+        fail("claims directory must not be a symlink")
     claims.mkdir(parents=True, exist_ok=True)
     while True:
         used = [int(p.name[:3]) for p in [*jobs.iterdir(), *claims.iterdir()] if re.match(r"\d{3}", p.name)]
         n = max(used, default=0) + 1
+        if n > 999:
+            fail("job numbering limit 999 reached")
         try:
             os.close(os.open(claims / f"{n:03d}", os.O_CREAT | os.O_EXCL))
             break
@@ -198,6 +344,7 @@ def cmd_new(slug, feature, *rest):
         "after": after,
         "stage": "spec",
         "round": 0,
+        "cycle_start_round": 1,
         "reviews": {lens: "pending" for lens in cfg["reviewers"]},
     }
     save(job)
@@ -212,9 +359,14 @@ def light_match(path, patterns):
 def cmd_start_round(job_id, n):
     n = int(n)
     job, cfg = load(job_id), config()
+    require_stage(job, "build")
+    require_budget(job, cfg)
+    if n != job["round"] + 1 or job.get("built") != n:
+        fail("review round must follow the recorded READY build and be the next round")
+    require_head(job, job.get("built_head"))
     branch, base = job["branch"], base_ref(job, cfg)
     whole = git("diff", "--name-only", f"{base}...{branch}").stdout.split()
-    if n == 1:
+    if n == job.get("cycle_start_round", 1):
         changed = whole
     else:
         prev = job.get("reviewed", {}).get(str(n - 1)) or fail(f"round {n - 1} was never recorded")
@@ -243,7 +395,7 @@ def cmd_start_round(job_id, n):
     light = bool(whole) and all(light_match(f, cfg["light"]) for f in whole)
     (job_dir(job_id) / f"round-{n}").mkdir(exist_ok=True)
     job.update(stage="review", round=n, reviewed_at=time.time())
-    job.setdefault("reviewed", {})[str(n)] = git("rev-parse", "--short", branch).stdout.strip()
+    job.setdefault("reviewed", {})[str(n)] = git("rev-parse", branch).stdout.strip()
     job["reviews"] = {lens: "pending" for lens in cfg["reviewers"]}
     for s in skipped:
         job["reviews"][s["lens"]] = "skipped"
@@ -255,15 +407,21 @@ def cmd_start_round(job_id, n):
 
 def cmd_verdict(job_id, n, lens):
     job = load(job_id)
-    if job["reviews"].get(lens) is None:
+    require_stage(job, "review")
+    if int(n) != job["round"]:
+        fail("verdict does not belong to the active round")
+    require_head(job, job.get("reviewed", {}).get(str(n)))
+    if not LENS.fullmatch(lens) or job["reviews"].get(lens) in (None, "skipped"):
         fail(f"{lens} is not a reviewer of {job_id}")
     path = job_dir(job_id) / f"round-{n}" / f"review-{lens}.md"
+    if path.is_file() and path.stat().st_mtime < job.get("reviewed_at", float("inf")):
+        fail("review file is older than the active review round")
     verdict = first_line(path, r"VERDICT: (PASS|CHANGES)", lens)
     job["reviews"][lens] = verdict
     save(job)
     values = job["reviews"].values()
     result = "pending" if "pending" in values else ("CHANGES" if "CHANGES" in values else "PASS")
-    text = path.read_text()
+    text = read_regular(path)
     # The reviewer's first reason, shown to the human; None when it wrote no ## Why
     why = re.search(r"^## Why\s*\n\s*[-*]\s*(.+)", text, re.M)
     report = {"lens": lens, "verdict": verdict, "why": why[1].strip() if why else None, "round_result": result}
@@ -282,7 +440,12 @@ def new_commits(job, cfg):
 
 def cmd_build(job_id):
     job, cfg = load(job_id), config()
-    status = first_line(job_dir(job_id) / "build.md", r"STATUS: (READY|BLOCKED)", "builder")
+    require_stage(job, "build")
+    require_budget(job, cfg)
+    report = job_dir(job_id) / "build.md"
+    if not report.is_file() or report.stat().st_mtime < job.get("build_started_at", job.get("reviewed_at", 0)):
+        fail("build report is missing or older than the current build dispatch")
+    status = first_line(report, r"STATUS: (READY|BLOCKED)", "builder")
     if status == "BLOCKED":
         # A block with nothing committed is often a glitch (an empty read, a dropped
         # tool call): one automatic retry per round before it reaches the human
@@ -295,6 +458,7 @@ def cmd_build(job_id):
     else:
         # Ready for the next round; resume trusts this, not a build.md left over
         job["built"] = job["round"] + 1
+        job["built_head"] = git("rev-parse", job["branch"]).stdout.strip()
         for run in [r for r in job.get("interrupted", {}) if r.startswith("builder")]:
             del job["interrupted"][run]
     save(job)
@@ -303,6 +467,11 @@ def cmd_build(job_id):
 
 def cmd_approve(job_id):
     job = load(job_id)
+    require_stage(job, "review")
+    require_budget(job, config())
+    if not job["reviews"] or "pending" in job["reviews"].values():
+        fail("all active reviews must be recorded before approval")
+    require_head(job, job.get("reviewed", {}).get(str(job["round"])))
     job.update(stage="approve", head=git("rev-parse", job["branch"]).stdout.strip())
     job["approved_at"] = time.time()  # a decision.md older than this is stale
     save(job)
@@ -311,7 +480,14 @@ def cmd_approve(job_id):
 
 def cmd_decision(job_id):
     job = load(job_id)
-    rec = first_line(job_dir(job_id) / "decision.md", r"RECOMMEND: (MERGE|HOLD)", "approver")
+    require_stage(job, "approve")
+    require_head(job, job.get("head"))
+    path = job_dir(job_id) / "decision.md"
+    if not path.is_file() or path.stat().st_mtime < job.get("approved_at", float("inf")):
+        fail("decision is missing or older than current approval")
+    rec = first_line(path, r"RECOMMEND: (MERGE|HOLD)", "approver")
+    if rec == "MERGE" and any(v not in ("PASS", "skipped") for v in job["reviews"].values()):
+        fail("MERGE requires passing completed reviews")
     job["stage"] = "ready" if rec == "MERGE" else "needs-human"
 
     save(job)
@@ -344,15 +520,32 @@ def cmd_set(job_id, *pairs):
         if not sep:
             fail(f"expected key=value, got {pair!r}")
         if key == "stage":
+            if value != job["stage"] and value != "build":
+                fail("set stage only starts/reworks a build; use dedicated commands for other stages")
+            if value == "build" and job["stage"] == "review" and ("pending" in job["reviews"].values() or "CHANGES" not in job["reviews"].values()):
+                fail("a review can return to build only after completed CHANGES verdicts")
+            if value == "build" and job["stage"] == "review" and job["round"] >= job.get("cycle_start_round", 1) + MAX_ROUNDS - 1:
+                fail("review round limit reached; request approval/HOLD and human rework")
+            if value == "build" and job["stage"] in ("approve", "merged"):
+                fail("job must await the human before rework")
             if value not in STAGES:
                 fail(f"stage must be one of {', '.join(STAGES)}")
             if value == "build" and job["stage"] in ("ready", "needs-human"):
+                job["cycle_start_round"] = job["round"] + 1
+                job.pop("head", None)
+                job.pop("approved_at", None)
+                job.pop("built", None)
+                job.pop("built_head", None)
                 job.pop("retried", None)  # a rework gets its own automatic retry
+            if value == "build" and job["stage"] != "build":
+                job["build_started_at"] = time.time()
             job["stage"] = value
         elif key.split(".")[0] in ("tokens", "seconds") and "." in key and value.isdigit():
             field, run = key.split(".", 1)
             add = run.endswith("+")
             run = run.rstrip("+").strip()
+            if not run:
+                fail("usage run name must not be empty")
             costs = job.setdefault(field, {})
             costs[run] = costs.get(run, 0) + int(value) if add else int(value)
             # A recorded cost means the run finished
@@ -363,8 +556,20 @@ def cmd_set(job_id, *pairs):
     out("ok")
 
 
+def cmd_invalidate(job_id):
+    job = load(job_id)
+    require_stage(job, "build", "review", "approve")
+    job["stage"] = "needs-human"
+    for key in ("head", "approved_at", "built", "built_head"):
+        job.pop(key, None)
+    save(job)
+    out({"next": "human", "reason": "stale work invalidated; explicit human rework required"})
+
+
 def cmd_interrupt(job_id, run):
     job = load(job_id)
+    if not run.strip():
+        fail("interrupted run name must not be empty")
     job.setdefault("interrupted", {})[run.strip()] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     save(job)
     out("ok")
@@ -376,6 +581,10 @@ def cmd_resume(job_id):
     job = load(job_id)
     d = job_dir(job_id)
     stage, n = job["stage"], job["round"]
+    if stage != "merged" and not budget(job, config())["allowed"]:
+        out({"id": job_id, "stage": stage, "round": n, "next": "human", "pending_lenses": [],
+             "verdict_lenses": [], "interrupted": sorted(job.get("interrupted", {})), "budget": budget(job, config())})
+        return
     pending, verdict = [], []
     if stage == "review":
         for lens, v in job["reviews"].items():
@@ -387,8 +596,8 @@ def cmd_resume(job_id):
     elif stage == "build":
         report = d / "build.md"
         # A build.md written since the last review round, not yet read by F build
-        fresh = report.is_file() and report.stat().st_mtime >= job.get("reviewed_at", 0)
-        status = report.read_text().split("\n", 1)[0].strip() if fresh else ""
+        fresh = report.is_file() and report.stat().st_mtime >= job.get("build_started_at", job.get("reviewed_at", 0))
+        status = read_regular(report).split("\n", 1)[0].strip() if fresh else ""
         if job.get("built") == n + 1:
             step = f"start-round {n + 1}"
         elif status == "STATUS: READY" or (status == "STATUS: BLOCKED" and job.get("retried") != n):
@@ -400,7 +609,7 @@ def cmd_resume(job_id):
         if pending or verdict:
             step = "reviewers"
         else:
-            step = "builder" if "CHANGES" in values and n < MAX_ROUNDS else "approve"
+            step = "builder" if "CHANGES" in values and n < job.get("cycle_start_round", 1) + MAX_ROUNDS - 1 else "approve"
     elif stage == "approve":
         # Only a decision.md written after the latest F approve belongs to this head
         decision = d / "decision.md"
@@ -414,10 +623,11 @@ def cmd_resume(job_id):
 
 COMMANDS = {
     "new": (cmd_new, (2, 4)), "info": (lambda j: out(info(load(j), config())), 1),
-    "resume": (cmd_resume, 1), "interrupt": (cmd_interrupt, 2),
+    "invalidate": (cmd_invalidate, 1), "resume": (cmd_resume, 1), "interrupt": (cmd_interrupt, 2),
     "start-round": (cmd_start_round, 2), "verdict": (cmd_verdict, 3), "build": (cmd_build, 1),
     "approve": (cmd_approve, 1), "decision": (cmd_decision, 1), "done": (cmd_done, 1),
     "set": (cmd_set, None),
+    "budget": (lambda j: out(budget(load(j), config())), 1),
 }
 
 if __name__ == "__main__":
@@ -428,4 +638,14 @@ if __name__ == "__main__":
     counts = argc if isinstance(argc, tuple) else (argc,)
     if len(args) not in counts if argc is not None else len(args) < 2:
         fail(f"{name} takes {' or '.join(map(str, counts)) if argc else 'at least 2'} argument(s)\n{__doc__}")
-    fn(*args)
+    try:
+        if name == "new":
+            config()  # reject invalid setup before creating lock/runtime directories
+            key = ".new"
+        else:
+            args[0] = find_job(args[0])
+            key = args[0]
+        with job_transaction(key):
+            fn(*args)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        fail(f"invalid state or I/O error: {exc}")

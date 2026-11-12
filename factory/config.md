@@ -10,6 +10,9 @@ paths.ux: src/
 paths.ui: src/
 light_paths: *.md, docs/
 marketing_business:
+max_chain_jobs: 3
+max_job_tokens: 500000
+max_job_seconds: 3600
 
 <!--
 marketing_business  Optional business ID for pre-spec consultation on relevant jobs.
@@ -17,6 +20,10 @@ marketing_business  Optional business ID for pre-spec consultation on relevant j
                     Private brief: marketing/businesses/<id>/brief.md.
                     To enable marketing review separately, append marketing to reviewers
                     and set paths.marketing to actual path prefixes; see MANUAL.md.
+max_chain_jobs   Maximum jobs in one linked chain (including the first).
+max_job_tokens   Gate further dispatch using reported completed tokens per job.
+max_job_seconds  Same gate for reported agent seconds (parallel runs add up).
+                 Positive integers; not real-time provider spending limits.
 base_branch  The branch jobs start from and merge back into.
 reviewers    Review lenses, each matching .claude/agents/reviewer-<lens>.md.
              Web apps: security, ux, ui, code. Backends: security, api, data, code.

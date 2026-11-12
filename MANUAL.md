@@ -239,7 +239,7 @@ You don't have to decide right away. The job, its branch and its folder stay in 
 The dashboard is a web page that shows every job as a card moving across the stages. It refreshes itself every 2 seconds.
 
 1. Open a terminal in your project folder.
-2. Run: `cd factory && python3 -m http.server`
+2. Run: `cd factory && python3 -m http.server --bind 127.0.0.1`
 3. Open <http://localhost:8000/dashboard.html> in your browser.
 4. To stop it, go back to the terminal and press `Ctrl+C`.
 
@@ -324,3 +324,26 @@ Avoid placing private customer evidence into reports exposed by the dashboard.
 
 Technical choices are documented against the official
 [Claude Code, Git and Python references](.claude/skills/marketing/references/implementation.md).
+
+
+## Security boundaries
+
+Use Claude Code 2.1.295 or newer on macOS/Linux. Review the project hooks, then
+explicitly trust the checkout in interactive Claude Code; headless `-p` does
+not establish trust. Stop if hooks are skipped or disabled. Native file-write
+hooks restrict report roles and protect factory policy paths, but Bash and test
+subprocesses still need a host sandbox. Keep credentials out of build worktrees.
+See [security hardening](docs/security-hardening.md) for exact limits and sources.
+
+Before copying this workflow or publishing example archives, remove private
+briefs, customer details, absolute personal paths, tokens, screenshots with
+private content, and repository history that should not leave the project.
+Ignore rules prevent accidental additions; they do not remove tracked secrets
+or scrub history. Review the staged diff and archive contents before publishing.
+
+The config defaults limit a chain to 3 jobs and gate dispatch after 500000
+reported completed tokens or 3600 reported agent seconds per job. These totals
+include parallel runs but cannot cap in-flight provider spending. Unknown usage
+remains unknown; use provider/session limits for a hard cap. Review limit
+increases explicitly. Per-job locks, fresh reports and unchanged reviewed commit
+IDs prevent accidental state skips and stale approvals.

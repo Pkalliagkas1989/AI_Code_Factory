@@ -15,3 +15,12 @@ pitch/source/frames/
 # Private marketing briefs, campaign drafts, customer evidence and results
 /marketing/businesses/*
 !/marketing/businesses/.gitkeep
+
+# Local secrets; review staged content and history before publishing
+.env
+.env.*
+!.env.example
+!.env.sample
+credentials.json
+*.pem
+*.key

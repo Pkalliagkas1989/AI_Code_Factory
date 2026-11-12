@@ -66,6 +66,12 @@ class Repo:
         self.git("add", ".", cwd=wt)
         self.git("commit", "-q", "-m", "feat: change", cwd=wt)
 
+    def ready_for_round(self, job_id):
+        # Selection tests use the same explicit build transition as the orchestrator.
+        self.f("set", job_id, "stage=build")
+        self.write(job_id, "build.md", "STATUS: READY\n")
+        return self.f("build", job_id)
+
     def write(self, job_id, name, text):
         (self.root / "factory" / "jobs" / job_id / name).write_text(text)
 
@@ -113,6 +119,7 @@ class ChainTest(FactoryTest):
         self.repo.commit_in("001-first", "first.txt")
         self.repo.f("new", "second", "Second", "--after", "001")
         self.repo.commit_in("002-second", "second.txt")
+        self.repo.f("set", "002-second", "stage=build")
         self.repo.write("002-second", "build.md", "STATUS: READY\n")
         self.repo.f("build", "002-second")
         self.repo.f("start-round", "002-second", "1")
@@ -307,6 +314,7 @@ class ChainMergeTest(FactoryTest):
         self.repo.commit_in("001-first", "first.txt")
         self.repo.f("new", "second", "Second", "--after", "001")
         self.repo.commit_in("002-second", "second.txt")
+        self.repo.f("set", "002-second", "stage=build")
         self.repo.write("002-second", "build.md", "STATUS: READY\n")
         self.repo.f("build", "002-second")
 
@@ -357,12 +365,14 @@ class MarketingIntegrationTest(FactoryTest):
         wt = Path(self.repo.job("001-launch")["worktree"])
         (wt / "content").mkdir()
         self.repo.commit_in("001-launch", "content/landing.md")
+        self.repo.ready_for_round("001-launch")
         result = self.repo.f("start-round", "001-launch", "1")
         self.assertEqual([r["lens"] for r in result["run"]], ["security", "code", "marketing"])
         self.assertEqual(self.repo.job("001-launch")["reviews"]["marketing"], "pending")
 
     def test_unrelated_change_skips_marketing_but_keeps_required_reviews(self):
         self.repo.commit_in("001-launch", "logic.txt")
+        self.repo.ready_for_round("001-launch")
         result = self.repo.f("start-round", "001-launch", "1")
         self.assertEqual([r["lens"] for r in result["run"]], ["security", "code"])
         self.assertEqual([r["lens"] for r in result["skipped"]], ["marketing"])
@@ -371,12 +381,14 @@ class MarketingIntegrationTest(FactoryTest):
         wt = Path(self.repo.job("001-launch")["worktree"])
         (wt / "content").mkdir()
         self.repo.commit_in("001-launch", "content/landing.md")
+        self.repo.ready_for_round("001-launch")
         self.repo.f("start-round", "001-launch", "1")
         for lens, verdict in [("security", "PASS"), ("code", "PASS"), ("marketing", "CHANGES")]:
             self.repo.write("001-launch", f"round-1/review-{lens}.md", f"VERDICT: {verdict}\n\n## Why\n- Evidence needed.\n")
             result = self.repo.f("verdict", "001-launch", "1", lens)
         self.assertEqual(result["round_result"], "CHANGES")
         self.repo.commit_in("001-launch", "evidence.md")
+        self.repo.ready_for_round("001-launch")
         result = self.repo.f("start-round", "001-launch", "2")
         self.assertEqual([r["lens"] for r in result["run"]], ["security", "code", "marketing"])
         self.assertEqual(result["run"][-1]["reason"], "asked for changes last round")

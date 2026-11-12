@@ -16,7 +16,8 @@ drafts and recommendations; it does not publish, contact customers or spend.
 
 [User manual](MANUAL.md) · [Marketing guide](marketing/README.md) ·
 [Research and bibliography](.claude/skills/marketing/references/bibliography.md) ·
-[Validation and remaining gates](docs/marketing-handoff.md)
+[Validation and remaining gates](docs/marketing-handoff.md) ·
+[Security boundaries and checks](docs/security-hardening.md)
 
 ## Build with `/factory`
 
@@ -86,7 +87,9 @@ exporting them. See [templates and examples](marketing/README.md).
 ## Add it to a project
 
 You need an authenticated Claude Code installation, Git with worktree support,
-and Python 3. The Python helpers use the standard library, with no package
+and Python 3 on macOS/Linux. Use Claude Code 2.1.295 or newer, review the
+agent hooks, and explicitly trust the project interactively before running the
+workflow. The Python helpers use the standard library, with no package
 installation. A browser tool is optional for reviews of a running UI; see the
 [manual](MANUAL.md) for setup and the limitations of code-only reviews.
 
