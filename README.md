@@ -1,5 +1,11 @@
 # AI Code Factory
 
+This is the **todo example branch**, including the shared factory and marketing
+workflow. Run `npm run dev -- 8000` and open <http://127.0.0.1:8000/index.html>.
+The development server binds to this computer only. `npm test` runs the Node
+suites; the [example handoff](docs/example-security-handoff.md) records the full
+Python and Node validation. Historical factory artifacts remain in `examples/`.
+
 **Build a feature you can inspect before merging. Prepare marketing you can test before launching.**
 
 AI Code Factory is a local workflow for [Claude Code](https://code.claude.com/).
