@@ -1,154 +1,192 @@
 # AI Code Factory
 
-A software factory for [Claude Code](https://claude.com/claude-code): one skill,
-seven subagents and a handful of markdown files. Type `/factory <feature>` and a
-team of agents writes a spec, builds it on its own git branch, and reviews it
-from four angles. Then the approver explains each department's work in plain
-words and hands you the exact commands to merge it. **You always do the merge.**
+**Build a feature you can inspect before merging. Prepare marketing you can test before launching.**
 
-```
-request ─► spec-writer ─► builder ─► security · ux · ui · code  (in parallel)
-                             ▲                    │
-                             └──── CHANGES ◄──────┤  (max 2 extra rounds)
-                                                  ▼
-                                              approver ─► plain-language report
-                                                        + recommendation (MERGE / HOLD)
-                                                        + merge commands for you to run
-```
+AI Code Factory is a local workflow for [Claude Code](https://code.claude.com/).
+It combines project skills, specialist agents and small Python helpers. Your
+project's instructions, Git history and review files stay central to the work.
 
-New to the factory? Read the [user manual](MANUAL.md): setup, commands,
-what happens during a job, and how to read the report and merge.
+| Start with | Get back |
+| --- | --- |
+| `/factory <feature>` | A specification, implementation on a separate branch, review files and a MERGE/HOLD recommendation. |
+| `/marketing <business-id> <task>` | Usable marketing drafts, evidence and assumptions, an experiment or discovery plan, and a private results history. |
 
-Want to see it work? The
-[`example/todo-app`](https://github.com/Pkalliagkas1989/AI_Code_Factory/tree/example/todo-app/examples)
-branch is a small todo app that grows one feature at a time through
-`/factory`, with every job's spec, reviews, decision and cost kept next to it.
+The installed factory stops at the human merge decision. Marketing produces
+drafts and recommendations; it does not publish, contact customers or spend.
 
-Short on time? Watch the [20-second pitch](pitch/ai-code-factory.mp4)
-([about it](pitch/README.md)).
+[User manual](MANUAL.md) · [Marketing guide](marketing/README.md) ·
+[Research and bibliography](.claude/skills/marketing/references/bibliography.md) ·
+[Validation and remaining gates](docs/marketing-handoff.md) ·
+[Security boundaries and checks](docs/security-hardening.md)
 
-Inspired by ZazenCodes' video
-[Build Your Own AI Software Factory with Claude Code](https://www.youtube.com/watch?v=ctoaIC4LHmI).
-All files here were written for this repo.
+## Build with `/factory`
 
-## What's inside
-
-```
-.claude/
-  skills/factory/
-    SKILL.md                  orchestrator: runs the loop
-    scripts/factory.py        job ids, worktrees, reviewer choice, job.json updates
-    references/               next/done/rework steps, job.json and selection rules
-  agents/
-    spec-writer.md            opus     → spec.md
-    builder.md                opus     → code commits + build.md
-    reviewer-security.md      opus     → round-N/review-security.md
-    reviewer-ux.md            sonnet   → round-N/review-ux.md
-    reviewer-ui.md            sonnet   → round-N/review-ui.md
-    reviewer-code.md          sonnet   → round-N/review-code.md
-    reviewer-api.md           sonnet   → round-N/review-api.md   (backends)
-    reviewer-data.md          sonnet   → round-N/review-data.md  (backends)
-    approver.md               opus     → decision.md (report + merge commands)
-factory/
-  config.md                   base branch, reviewers, environment notes
-  backlog.md                  feature queue for /factory next
-  dashboard.html              live board of all jobs
-  jobs/                       runtime state, one folder per job (gitignored)
-templates/
-  CLAUDE.md                   fill-in template for your project
+```text
+/factory Add an items-left counter to the task list
 ```
 
-## How it works
+```text
+request → optional marketing consultation → specification → build
+                                                            ↓
+                              security · code · configured specialist reviews
+                                                            ↓
+                       changes needed? → rework, up to two extra rounds
+                                                            ↓
+                                    approver → human merge decision
+```
 
-- The Claude session that runs `/factory` is the **orchestrator**. It starts
-  every agent and is the only writer of the job's `job.json`, always through
-  `scripts/factory.py`. The script does the mechanical steps (claiming a job
-  id, picking reviewers, checking each file's first line) the same way every
-  time, so they don't depend on how the instructions are read.
-- Agents don't share a conversation. They read files, and each writes **one**
-  file. Reviews start with `VERDICT: PASS` or `VERDICT: CHANGES`; the decision
-  starts with `RECOMMEND: MERGE` or `RECOMMEND: HOLD`.
-- The reviewers run **in parallel**. Which ones run is set in `factory/config.md`. When any of them asks for changes, the
-  same builder is resumed with their feedback.
-- The approver writes `decision.md`: a short plain-language summary of what
-  each department (spec, build, security, UX, design, code) did, a
-  recommendation (MERGE, or HOLD for anything risky like payments, auth,
-  deployment config, new dependencies, migrations or business decisions), and
-  ready-to-paste merge commands.
-- **The factory never merges, pushes or deletes branches.** You run the
-  commands, then `/factory done <job-id>` confirms the merge on the dashboard.
-- **Production-ready commit messages**: your project's convention from
-  `CLAUDE.md`, otherwise [Conventional Commits](https://www.conventionalcommits.org)
-  (`feat(auth): add password reset` plus a body explaining what and why). The
-  code reviewer rejects vague messages, and the approver writes the merge
-  commit message.
-- Every job gets its own **git worktree** (`../<repo>-factory/<job-id>/`) on a
-  `factory/<job-id>` branch. Open several Claude sessions and run `/factory` in
-  each to build features in parallel.
+Each job gets a `factory/<job-id>` branch and its own Git worktree. Agents
+write inspectable artifacts: `spec.md`, `build.md`, `round-N/review-*.md` and
+`decision.md`. The final report explains what changed, what was checked, what
+remains unresolved and which commands the human can run next.
 
-## Security first, then tokens
+Security and code review run every round. Other lenses run according to the
+project's configured paths; a reviewer that requests changes runs again.
+Available lenses cover UX, UI, API, data and marketing. Passing agent review is
+review evidence, not proof of security or production readiness.
 
-Every agent run has a fixed start-up cost (its instructions, the project
-docs, the diff). In the first test job, on a small app, a reviewer used 11k
-to 15k tokens, the builder 29k and the whole job 131k over 8 runs. The
-factory saves tokens by running fewer and leaner agents, never by checking
-less:
+The factory never merges, pushes, deletes branches or removes worktrees. It
+hands those actions back to the human. Business decisions such as new prices,
+guarantees and public claims remain explicit approval points.
 
-- **Security and code review always run**, in every round. API, data, UX and UI
-  reviews run only when the job changes files in their area
-  (`paths.<lens>` in `factory/config.md`). When in doubt, they run.
-- **Later rounds** re-run security and code, plus only the reviewers that asked
-  for changes or whose area the fixes touched.
-- **Security stays on Opus** for any code change. It drops to Sonnet only when a
-  job changes nothing but docs (`light_paths`).
-- **Batching:** `/factory next 3` runs up to three small backlog items as one
-  job. Auth, permissions, payments, secrets, migrations and deployment items
-  always run alone.
-- **Context budget:** agents start from the diff, read only the lines they need,
-  and only the builder and the code reviewer run the full test suite.
-- **Visible cost:** the orchestrator records each agent run's tokens and time in
-  `job.json`. The dashboard shows the totals on each card, and a **cost** view
-  per run when you open a card.
+## Work with `/marketing`
+
+```text
+/marketing ai-code-factory draft a developer launch campaign
+/marketing stock-notes plan customer discovery before launch
+/marketing stock-notes analyze our latest pilot results
+```
+
+One consultant serves the factory itself and the products built with it. Each
+business has its own audience, offer, evidence, decisions and history:
+
+```text
+marketing/businesses/<business-id>/
+  brief.md
+  results.md
+  runs/<task-id>/report.md
+```
+
+Assignments produce actual copy, campaign briefs, email drafts, sales scripts,
+interview questions or results analysis. Each includes its research basis,
+relevant limits, assumptions, a credible alternative and a measurable next step.
+Missing customer evidence stays unknown. Weak product fit can lead to a
+recommendation to do discovery, revise the product or stop promotion.
+
+The [research guide](.claude/skills/marketing/references/research.md) qualifies ten
+principles rather than forcing every tactic into every campaign. The
+[bibliography](.claude/skills/marketing/references/bibliography.md) records 21
+academic publications plus NIST method documentation, source access and transfer
+limits. Published research informs the proposals; real business results require
+local evidence and testing. The bundled count and evaluation fixtures are synthetic.
+
+Private business records are ignored by Git. Keep the ignore rules when copying
+the workflow, and review reports before sharing them through the dashboard or
+exporting them. See [templates and examples](marketing/README.md).
+
+## Add it to a project
+
+You need an authenticated Claude Code installation, Git with worktree support,
+and Python 3 on macOS/Linux. Use Claude Code 2.1.295 or newer, review the
+agent hooks, and explicitly trust the project interactively before running the
+workflow. The Python helpers use the standard library, with no package
+installation. A browser tool is optional for reviews of a running UI; see the
+[manual](MANUAL.md) for setup and the limitations of code-only reviews.
+
+1. Copy `.claude/` and `factory/` into the project root. For marketing, also copy
+   `marketing/`, excluding other businesses' private records. Merge existing
+   configurations carefully instead of overwriting them.
+2. Add the runtime ignore rules to the project's `.gitignore`:
+
+   ```gitignore
+   /factory/jobs/*
+   !/factory/jobs/.gitkeep
+   /marketing/businesses/*
+   !/marketing/businesses/.gitkeep
+   __pycache__/
+   ```
+3. Use [templates/CLAUDE.md](templates/CLAUDE.md) to describe the stack, setup,
+   checks and conventions. Merge it into any existing project instructions.
+4. Edit `factory/config.md`: choose the base branch, reviewer paths, setup
+   commands and settled human decisions. Keep `security` and `code` in both
+   `reviewers` and `always`.
+5. Commit the setup, open Claude Code in the project and try one small feature.
+   For marketing alone, run `/marketing` with a separate business ID; it can
+   start a provisional brief from verified project facts.
+
+### Connect marketing to factory jobs
+
+For consultation on relevant jobs, set the business ID in `factory/config.md`:
+
+```text
+marketing_business: stock-notes
+```
+
+Leave it empty to disable consultation. When enabled, the orchestrator consults
+marketing before the specification for positioning, offers, public copy, landing
+pages, onboarding or conversion work. Its `marketing.md` is input to the spec
+writer, builder and approver. Unrelated jobs skip it.
+
+Marketing review is a separate optional gate. Adapt these paths to the project:
+
+```text
+reviewers: security, ux, ui, code, marketing
+always: security, code
+paths.marketing: src/landing/, src/onboarding/, content/
+```
+
+These are path prefixes. Without `paths.marketing`, marketing review always
+runs. Consultation does not count as review and does not replace technical gates.
 
 ## Commands
 
-```
-/factory <feature>               run a new feature through the loop
-/factory next [n]                run the next backlog item (or batch up to 3 small ones)
-/factory done <job-id>           after you ran the merge commands: verify and mark merged
-/factory rework <job-id> <note>  send a waiting job back to the builder with feedback
-```
+| Command | Purpose |
+| --- | --- |
+| `/factory <feature>` | Run a feature through specification, build, review and approval. |
+| `/factory next [n]` | Take the next backlog item, or batch up to three suitable small items. |
+| `/factory chain N [after JOB]` | Build separate dependent jobs without merging between them. |
+| `/factory resume <job-id>` | Continue an interrupted job from its recorded state. |
+| `/factory rework <job-id> <note>` | Rework a job waiting for the human. |
+| `/factory done <job-id>` | Verify the human's merge and update the job status. |
+| `/marketing <business-id> <task>` | Produce a business-specific draft, plan or analysis. |
 
-## Adding it to a project
+## Inspect jobs and costs
 
-1. Copy `.claude/` and `factory/` into the project's root.
-2. Add these lines to the project's `.gitignore`:
-   ```
-   /factory/jobs/*
-   !/factory/jobs/.gitkeep
-   ```
-3. Copy `templates/CLAUDE.md` to the project root (or merge it into the existing
-   one) and fill it in. Agents learn the setup, dev server, tests and
-   conventions from it, and nothing else.
-4. Edit `factory/config.md`: the base branch, the reviewers
-   (`security, ux, ui, code` for web apps, `security, api, data, code` for
-   backends), and any environment notes the agents need.
-5. If the project has pages to look at, install
-   [`agent-browser`](https://github.com/vercel-labs/agent-browser) so the
-   builder and the UX/UI reviewers can see the running app:
-   `npm install -g agent-browser@0.39.0`. Without it they only read the code,
-   and `/factory` says so at the start of each review round.
-6. Commit on the base branch, open Claude Code in the project and run `/factory <feature>`.
-
-The review checklists are general on purpose. Ask Claude to tailor them to your
-stack once you know what matters most.
-
-## Dashboard
+Serve the dashboard locally from the repository root:
 
 ```bash
-cd factory && python3 -m http.server
+python3 -m http.server 8000 --bind 127.0.0.1 --directory factory
 ```
 
-Open <http://localhost:8000/dashboard.html>. Cards move across the stages, the
-review chips turn green or red as verdicts come in, and jobs waiting for you
-("ready to merge" or "needs you") are highlighted. Click a card to read its files. It refreshes every 2 seconds.
+Open [the local dashboard](http://127.0.0.1:8000/dashboard.html). It shows stages,
+review verdicts and job artifacts. Agent token counts and durations appear when
+the runtime reports them; missing usage is not guessed. Conditional reviews,
+bounded rework and focused context reduce repeated work, but there is no fixed
+cost or time-saving guarantee.
+
+## Verify the helpers
+
+```bash
+python3 -m unittest discover -s .claude/skills/factory/scripts
+python3 -m unittest discover -s .claude/skills/marketing/scripts
+python3 .claude/skills/marketing/scripts/analyze.py .claude/skills/marketing/examples/synthetic-counts.json
+```
+
+The count helper reports conversion rates, per-cohort Wilson 95% intervals and
+descriptive uplift. It does not test the difference between cohorts or declare a
+campaign winner. Read the [measurement guide](.claude/skills/marketing/references/measurement.md)
+before using real data. [Official implementation references](.claude/skills/marketing/references/implementation.md)
+document the Claude Code, Git and Python mechanics.
+
+See the [handoff](docs/marketing-handoff.md) for exact automated and live test
+coverage, discovered issues and remaining operational or field-validation gates.
+
+## Examples and origins
+
+The [`example/todo-app` branch](https://github.com/Pkalliagkas1989/AI_Code_Factory/tree/example/todo-app/examples)
+contains a small todo app developed through factory jobs, with retained specs,
+reviews and decisions. These are examples, not a benchmark of future results.
+
+Watch the [20-second pitch](pitch/ai-code-factory.mp4)
+([production notes](pitch/README.md)). The original workflow was inspired by
+ZazenCodes' [Build Your Own AI Software Factory with Claude Code](https://www.youtube.com/watch?v=ctoaIC4LHmI).

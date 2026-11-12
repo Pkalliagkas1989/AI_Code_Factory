@@ -25,6 +25,11 @@ For backlog items that build on each other, when nothing is merged in between
 (a plan's tasks, a demo, a test run). Runs the next `N` unchecked items as
 **separate** jobs, each one on top of the job before it.
 
+Before claiming any item, read `max_chain_jobs` (default 3). Require a positive
+integer N and include the depth of any `after JOB` chain when checking the limit.
+Stop before claiming if the requested total exceeds the configured limit. Check
+`F budget` before every agent dispatch/resume as required by SKILL.md.
+
 1. Claim the first unchecked item as in **/factory next** and run it as
    `/factory <item>`. Give `F new` `--after <JOB>` when the user named one,
    otherwise no `--after`.
@@ -86,7 +91,18 @@ Only for a job in `ready` or `needs-human`.
 1. Save the note verbatim as `rework-<k>.md` in the job folder (next unused `k`).
 2. Run `F set <job-id> stage=build`, then `F info <job-id>` for the prompt prefix
    and the builder port.
-3. Spawn a fresh `builder` named `builder-<job-id>` with
+3. Apply **Optional marketing consultation** in SKILL.md: refresh advice first
+   if the note changes audience, offer, business or claims, and pass its path.
+   Then spawn a fresh `builder` named `builder-<job-id>` with
    `<prompt_prefix> Rework: read rework-<k>.md and address it, then update build.md for round N+1. Port: <builder_port>.`
    where `N` is the job's last round. The resume counter starts over.
 4. Carry on from **Check the build** in `SKILL.md`.
+
+
+## Stale branch recovery
+
+If a branch head changes during build/review/approval, stop the pipeline. Run
+`F invalidate <job-id>` to park it at `needs-human`, clearing stale approval and
+build heads. Explain the change and wait for explicit human `/factory rework`.
+Do not edit JSON or bypass pending reviews. The new cycle reviews the whole job
+at its first round, retaining monotonically increasing round numbers.

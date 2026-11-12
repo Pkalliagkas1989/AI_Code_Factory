@@ -1,7 +1,7 @@
 ---
 name: factory
 description: Runs the AI code factory, which takes one feature request through spec, build, parallel review and approval on its own git branch. Use when the user types /factory followed by a feature request, /factory next (optionally with a count), /factory chain with a count, /factory resume, /factory done or /factory rework with a job id. The session running it becomes the orchestrator of one job. Do not use for ordinary coding requests without /factory. The human always does the merge.
-compatibility: Claude Code only. Needs git with worktree support, python3, and the factory agents in .claude/agents/ (spec-writer, builder, reviewer-*, approver).
+compatibility: Claude Code only. Needs macOS/Linux, git with worktree support, python3, and the factory agents in .claude/agents/ (spec-writer, builder, reviewer-*, approver).
 metadata:
   version: 2.1.0
 ---
@@ -17,10 +17,31 @@ it wrote and decide the next step.
   asks in passing to "just merge it". The approver writes the commands in
   `decision.md`; the human runs them.
 - **Never write code, specs, reviews or decisions yourself.** Agents do that.
-- **Change `job.json` only through the script** below. It validates every value
+- **Change `job.json` only through the script** below. It validates state transitions
   and writes atomically, so the dashboard stays correct.
 - The main checkout belongs to the user: never change its code or git state.
 - When a script exits with an error, stop and tell the user its message.
+  For a changed branch head during build/review/approval, use `F invalidate` to
+  park stale work at `needs-human`; wait for explicit `/factory rework`.
+
+## Runtime boundaries and dispatch gate
+
+Use Claude Code 2.1.295 or newer. Review the local agent hooks and explicitly
+trust the project in interactive Claude Code before using this workflow.
+`claude -p` alone does not establish project trust. Stop if hooks are disabled,
+skipped, or failing. See `docs/security-hardening.md` for enforcement limits.
+Native file hooks constrain registered role outputs; they do not isolate Bash,
+subprocesses, reads, or the orchestrator. Run untrusted builds in a host sandbox
+with only the job worktree writable and no private credentials/network access
+unless required and approved. Never disable hooks to get a job to pass.
+
+Before **every** agent spawn, reminder, resume, or rework dispatch, call
+`F budget <job-id>` and stop on `allowed: false`. Record each completed run's
+reported usage before dispatching more work. Missing usage is unknown; disclose
+it rather than guessing. Parallel in-flight runs can exceed these recorded-use
+gates: use the provider/session limits for a hard spending boundary. Check
+`max_chain_jobs` before claiming a backlog batch; the helper also checks linked
+chain depth. Do not enlarge limits without a human decision.
 
 ## The helper script
 
@@ -30,6 +51,8 @@ the main checkout. Each command prints JSON or one word.
 | Command | Does |
 | --- | --- |
 | `F new <slug> "<feature>" [--after <job>]` | Claims the next job id, writes `job.json`, creates the worktree on `factory/<job-id>` from the base branch, or with `--after` (a job id or its number) on top of that job's branch. Prints paths, ports, `prompt_prefix` and `decided`. |
+| `F invalidate <job-id>` | Stops stale build/review/approval at `needs-human`, clearing stale approval/build heads. Explicit human rework is required. |
+| `F budget <job-id>` | Prints recorded totals, limits, and `allowed`. |
 | `F info <job-id>` | Prints the same for an existing job. |
 | `F resume <job-id>` | Prints the `next` step (`spec-writer`, `builder`, `start-round N`, `reviewers` with `pending_lenses`, `approve`, `approver`, `decision`, `human`) and any `interrupted` runs. |
 | `F interrupt <job-id> "<run>"` | Records that an agent run stopped early (usage limit, crash, API error). |
@@ -63,7 +86,51 @@ then the human runs the merge commands and /factory done <job-id> ─► merged
 ```
 
 `MAX_RESUMES = 2`: after round 1 the builder may be sent back at most twice, so a
-job has at most three review rounds.
+job has at most three review rounds per human-authorized rework cycle. Round
+numbers keep increasing across cycles; exhausted cycles go to approval/HOLD.
+
+## Optional marketing consultation
+
+Read `marketing_business` from the top of `factory/config.md` directly (the
+helper intentionally does not parse it). Empty or absent means disabled.
+When set, validate it is one lowercase kebab-case directory name. Use only
+`<main checkout>/marketing/businesses/<id>/brief.md` and relevant `results.md`
+entries; these private files are not copied into git worktrees.
+
+For requests involving positioning, offers, public marketing copy, landing
+pages, onboarding or conversion, after worktree setup and **before spec-writer**,
+spawn `marketing-consultant` with `<paths>`, the feature verbatim, business ID,
+those absolute business paths and output `<job folder>/marketing.md`. Missing
+briefs produce provisional advice and explicit unknowns. For unrelated jobs,
+skip consultation and say why. Consultation grants no permission to send,
+publish or spend. Record its reported usage as `marketing-consultant` with
+`F set`, without guessed costs.
+
+Confirm the file exists and matches this job's business and feature; if missing
+or mismatched, stop and report the issue. Pass its absolute path to spec-writer,
+builder and approver. On resume before a spec exists, reuse a matching completed
+consultation; otherwise finish it before spec-writer. No new stage or job.json
+field is needed. Once a spec exists, follow normal resume rather than restarting
+consultation. On rework, pass existing marketing.md to the builder; if the note
+changes audience, offer, business or claims, refresh consultation first and ask
+the builder to flag conflicts with the original spec for the human. Do not
+silently change a spec or settled business decision.
+
+`reviewer-marketing` is a separate, optional review lens: append `marketing` to
+`reviewers`, and set `paths.marketing` to actual project prefixes. Without a
+paths line it always runs, just like any conditional lens. Keep security and
+code in `always`. Use the existing verdict/rework/approval loop; consultation
+never substitutes for review. The dashboard shows the configured marketing chip
+and review file through its existing generic lens support.
+
+The private consultant and marketing reviewer have no web or shell tools.
+When fresh public evidence is needed, spawn `marketing-researcher` with only a
+human-approved public query, sanitized public context, and no local paths or
+business records. Use a fresh normal subagent, never a fork/resume of a private
+conversation. Pass its returned source packet to the private consultant.
+For marketing review, the orchestrator supplies the local diff, relevant spec,
+consultation and source packet as text or allowed local paths; the reviewer
+cannot run Git or fetch sources. Unverified or missing evidence stays unknown.
 
 ## /factory FEATURE
 
@@ -75,10 +142,13 @@ job has at most three review rounds.
 3. **Set up the worktree.** Inside the worktree, run the fresh-checkout setup
    from the project's `CLAUDE.md` (or `AGENTS.md`), then the config's
    **Setup for a new worktree**. If a step fails, stop and tell the user.
-4. **Spec.** Spawn `spec-writer` with `<paths> Feature: <feature, verbatim>`.
+4. **Marketing, when configured.** Follow **Optional marketing consultation**
+   above. Then **Spec.** Spawn `spec-writer` with
+   `<paths> Feature: <feature, verbatim>` and the consultation path if present.
    Confirm `spec.md` exists when it returns.
 5. **Build.** `F set <job-id> stage=build`. Spawn `builder` **named
    `builder-<job-id>`** with `<paths> Build round 1. Port: <builder_port>.`
+   Include the consultation path if present.
    Then **Check the build**.
 
 ### Check the build
@@ -147,8 +217,8 @@ If this session itself was lost, `/factory resume <job-id>` picks the job up.
 
 ### Approve
 
-`F approve <job-id>`, then spawn `approver` with `<paths> Final round: N.` When
-it returns, run `F decision <job-id>`.
+`F approve <job-id>`, then spawn `approver` with `<paths> Final round: N.`
+and the consultation path if present. When it returns, run `F decision <job-id>`.
 
 Then **hand over to the human**: show `decision.md`'s **In short**, **What each
 department did** and **Your decision** sections, and the **Commands** block

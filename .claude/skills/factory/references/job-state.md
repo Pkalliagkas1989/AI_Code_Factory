@@ -18,6 +18,7 @@ Inside a job folder:
 
 ```
 job.json                      state, written only by the script, read by the dashboard
+marketing.md                  optional marketing-consultant input; no new stage
 spec.md                       spec-writer
 build.md                      builder
 rework-<k>.md                 orchestrator, from /factory rework
@@ -96,3 +97,37 @@ not listed in `always`. When in doubt, a lens runs.
 Each agent's file sets its model. One exception: when **every** file the job
 changed matches `light_paths` (a prefix, or a `*.ext` pattern), the security
 reviewer runs on `sonnet` instead of `opus`. Any code change keeps it on `opus`.
+
+## Marketing integration
+
+`marketing_business` is read by the orchestrator directly from config.md. It
+selects a private business brief for optional consultation before specification;
+it does not change job.json. Consultation output is job `marketing.md`, passed
+to the spec writer, builder and approver. Resume/rework rules live in SKILL.md.
+
+The optional `marketing` reviewer uses the existing generic lens selection,
+`review-marketing.md` and PASS/CHANGES handling. No Python or dashboard schema
+extension is required. Security/code remain mandatory. Business/private raw
+data stays outside job reports; the dashboard serves job files to anyone with
+access to its HTTP server.
+
+## Integrity and limits
+
+Commands serialize through per-job advisory locks (10-second acquisition limit)
+and atomically replace state using a unique temporary file. IDs and embedded
+branch identity must agree; runtime JSON/reports are regular, singly linked
+UTF-8 files no larger than 1 MiB. Symlink state is rejected. macOS/Linux is
+required. These are consistency checks under trusted local ownership, not
+protection against a hostile same-user process or filesystem races.
+
+`built_head`, reviewed full commit IDs, and approval head bind each transition
+to the current branch. Verdicts must name the current round and have reports
+newer than its start; decisions must be newer than approval. Security and code
+cannot be skipped. After three rounds, approval/HOLD precedes human rework.
+`cycle_start_round` starts a new three-round cycle without reusing old numbers.
+
+`max_chain_jobs`, `max_job_tokens` and `max_job_seconds` are positive config
+integers, defaulting to 3, 500000 and 3600. `F budget` and `F resume` expose the
+recorded-use gate; builds, new rounds and approval refuse exhausted budgets.
+They count reported completed agent usage, not wall time or provider billing.
+Unknown usage and parallel/in-flight work require separate runtime limits.

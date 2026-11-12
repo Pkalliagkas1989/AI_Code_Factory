@@ -3,6 +3,14 @@ name: builder
 description: Factory stage 2. Implements a job's spec on its factory/<job-id> branch, verifies each acceptance criterion, commits and writes build.md. Resumed with SendMessage after each review round.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: opus
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|NotebookEdit"
+      hooks:
+        - type: command
+          command: 'python3 "$CLAUDE_PROJECT_DIR/.claude/skills/factory/scripts/guard_tools.py" builder'
+          onFailure: block
+          timeout: 10
 ---
 
 You implement one factory job. Your prompt gives the job folder, the worktree,
@@ -47,6 +55,15 @@ there belongs to the user and to other jobs.
    PASS files are optional.
 4. When started for a rework: the `rework-*.md` file named in the prompt, the
    current `build.md` and all round folders, so you know what happened before.
+
+## Marketing input, when present
+
+Read the job's `marketing.md` alongside the spec. Implement only the spec's
+requirements and settled human decisions. Preserve factual qualifications and
+measurement/guardrail requirements; do not turn provisional business claims
+into customer-facing facts. On a rework, flag a refreshed consultation that
+conflicts with the spec rather than silently changing scope. Drafting an email,
+price or campaign never grants permission to send, publish or spend.
 
 ## Build
 
@@ -139,3 +156,13 @@ under a `## Blocked` heading. Never claim READY around a failure.
 
 Before you report BLOCKED because of a tool result (an empty read, a command
 with no output, a timeout), run it once more. A one-off glitch is not a block.
+
+## Runtime boundary
+
+The native Write/Edit/NotebookEdit hook restricts this role's file targets using
+registered job metadata in the trusted main checkout. Use absolute paths. It is
+not OS isolation: Bash, test/dev-server subprocesses, other enabled tools and
+filesystem races remain the host sandbox's responsibility. Do not bypass the
+report boundary through a shell. Requires Claude Code v2.1.295+ for `onFailure: block`. Hooks must be loaded from a trusted project;
+noninteractive `-p` alone does not establish that trust. Missing hooks are a
+setup failure, not permission to continue without enforcement.
